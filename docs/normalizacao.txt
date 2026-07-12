@@ -1,0 +1,8 @@
+No modelo não tem atributos multivalorados/compostos (como listas ou arrays armazenados em uma única coluna). (1a Forma Normal)
+-> 'alergias' é campo de texto simples, como se fosse observações, não foi projetado para receber nomes de alergias separados por vírgula.
+
+A única tabela com chave primária composta é PROCEDIMENTO_REALIZADO (id_atendimento + id_procedimento).
+-> Os atributos não-chave ('quantidade', 'tempo_real_minutos' e 'observacao') precisam de ambas as colunas da chave para serem identificadas (são plenamente dependentes). (2a Forma Normal)
+
+No modelo, todos os atributos não-chave dependem direta e exclusivamente da chave primária de suas respectivas tabelas. (3a Forma Normal)
+-> ATENDIMENTO e ESCALA têm apenas as chaves estrangeiras (IDs) das entidades relacionadas, sem atributos como o nome do paciente, nome do médico ou capacidade de leitos da unidade dentro das tabelas. O que não causa dependências transitivas.

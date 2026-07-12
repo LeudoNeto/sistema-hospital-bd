@@ -1,0 +1,21 @@
+PESSOA (id_pessoa [PK], nome, cpf [UNIQUE], data_nascimento, is_flamengo, telefone)
+
+PACIENTE (id_pessoa [PK] [FK -> PESSOA], num_convenio, alergias, grupo_sanguineo, endereco)
+
+PROFISSIONAL (id_pessoa [PK] [FK -> PESSOA], CRM [UNIQUE], data_admissao, especialidade)
+
+PRECEPTOR (id_profissional [PK] [FK -> PROFISSIONAL], titulacao)
+
+RESIDENTE (id_profissional [PK] [FK -> PROFISSIONAL], ano_residencia)
+
+HISTORICO_PROFISSIONAL (id_historico [PK], id_profissional [FK -> PROFISSIONAL], papel, data_inicio, data_fim)
+
+UNIDADE (id_unidade [PK], nome, tipo, capacidade_leitos)
+
+PROCEDIMENTO (id_procedimento [PK], codigo [UNIQUE], nome, tempo_medio_minutos, nivel_risco)
+
+ATENDIMENTO (id_atendimento [PK], data_hora, duracao_minutos, id_paciente [FK -> PACIENTE], id_residente [FK -> RESIDENTE], id_preceptor [FK -> PRECEPTOR])
+
+PROCEDIMENTO_REALIZADO (id_atendimento [PK] [FK -> ATENDIMENTO], id_procedimento [PK] [FK -> PROCEDIMENTO], quantidade, tempo_real_minutos, observacao, is_faturado)
+
+ESCALA (id_escala [PK], dia_semana, mes_referencia, ano_referencia, turno, id_unidade [FK -> UNIDADE], id_residente [FK -> RESIDENTE], id_preceptor [FK -> PRECEPTOR])
