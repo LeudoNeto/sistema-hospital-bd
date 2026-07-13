@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sistema Hospitalar</title>
+    <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+    <header class="topo">
+        <h1>🏥 Sistema Hospitalar</h1>
+        <p>Painel de gestão de atendimentos, procedimentos e relatórios</p>
+    </header>
+
+    <nav class="abas">
+        <button class="aba ativa" data-aba="atendimentos">Atendimentos</button>
+        <button class="aba" data-aba="procedimentos">Procedimentos</button>
+        <button class="aba" data-aba="pacientes">Pacientes</button>
+        <button class="aba" data-aba="relatorios">Relatórios</button>
+    </nav>
+
+    <main>
+        <!-- ============================ ATENDIMENTOS ======================= -->
+        <section id="atendimentos" class="painel ativo">
+            <div class="card">
+                <h2>Novo atendimento</h2>
+                <form id="form-criar-atendimento" class="form-grid">
+                    <label>Data e hora
+                        <input type="datetime-local" name="data_hora" required />
+                    </label>
+                    <label>Duração (min)
+                        <input type="number" name="duracao_minutos" min="1" required />
+                    </label>
+                    <label>ID paciente
+                        <input type="number" name="id_paciente" min="1" required />
+                    </label>
+                    <label>ID residente
+                        <input type="number" name="id_residente" min="1" required />
+                    </label>
+                    <label>ID preceptor
+                        <input type="number" name="id_preceptor" min="1" required />
+                    </label>
+                    <button type="submit" class="btn primario">Cadastrar</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h2>Atendimentos de um paciente</h2>
+                <form id="form-listar-atendimentos" class="form-inline">
+                    <label>ID paciente
+                        <input type="number" name="id_paciente" min="1" required />
+                    </label>
+                    <button type="submit" class="btn">Listar</button>
+                </form>
+                <div id="resultado-atendimentos" class="resultado"></div>
+            </div>
+        </section>
+
+        <!-- ============================ PROCEDIMENTOS ====================== -->
+        <section id="procedimentos" class="painel">
+            <div class="card">
+                <h2>Procedimentos de um atendimento</h2>
+                <form id="form-listar-procedimentos" class="form-inline">
+                    <label>ID atendimento
+                        <input type="number" name="id_atendimento" min="1" required />
+                    </label>
+                    <button type="submit" class="btn">Listar</button>
+                </form>
+                <div id="resultado-procedimentos" class="resultado"></div>
+            </div>
+
+            <div class="card">
+                <h2>Remover procedimento realizado</h2>
+                <p class="ajuda">Só é permitido remover procedimentos que ainda não foram faturados.</p>
+                <form id="form-remover-procedimento" class="form-inline">
+                    <label>ID atendimento
+                        <input type="number" name="id_atendimento" min="1" required />
+                    </label>
+                    <label>ID procedimento
+                        <input type="number" name="id_procedimento" min="1" required />
+                    </label>
+                    <button type="submit" class="btn perigo">Remover</button>
+                </form>
+            </div>
+        </section>
+
+        <!-- ============================ PACIENTES ========================== -->
+        <section id="pacientes" class="painel">
+            <div class="card">
+                <h2>Atualizar dados do paciente</h2>
+                <p class="ajuda">Preencha ao menos um campo (endereço ou convênio).</p>
+                <form id="form-atualizar-paciente" class="form-grid">
+                    <label>ID paciente
+                        <input type="number" name="id_paciente" min="1" required />
+                    </label>
+                    <label>Endereço
+                        <input type="text" name="endereco" placeholder="(opcional)" />
+                    </label>
+                    <label>Convênio
+                        <input type="text" name="num_convenio" placeholder="(opcional)" />
+                    </label>
+                    <button type="submit" class="btn primario">Atualizar</button>
+                </form>
+            </div>
+        </section>
+
+        <!-- ============================ RELATÓRIOS ========================= -->
+        <section id="relatorios" class="painel">
+            <div class="card">
+                <h2>Tempo médio por residente</h2>
+                <button class="btn" data-relatorio="tempo-medio-residentes">Gerar</button>
+                <div id="rel-tempo-medio" class="resultado"></div>
+            </div>
+
+            <div class="card">
+                <h2>Ranking de residentes</h2>
+                <button class="btn" data-relatorio="ranking-residentes">Gerar</button>
+                <div id="rel-ranking" class="resultado"></div>
+            </div>
+
+            <div class="card">
+                <h2>Preceptores com mais de 5 atendimentos no mês</h2>
+                <form id="form-preceptores" class="form-inline">
+                    <label>Mês
+                        <input type="number" name="mes" min="1" max="12" value="7" required />
+                    </label>
+                    <label>Ano
+                        <input type="number" name="ano" min="2000" value="2026" required />
+                    </label>
+                    <button type="submit" class="btn">Gerar</button>
+                </form>
+                <div id="rel-preceptores" class="resultado"></div>
+            </div>
+
+            <div class="card">
+                <h2>Plantões por unidade (mês corrente)</h2>
+                <button class="btn" data-relatorio="plantoes-por-unidade">Gerar</button>
+                <div id="rel-plantoes" class="resultado"></div>
+            </div>
+
+            <div class="card">
+                <h2>Pacientes sem procedimento de risco alto</h2>
+                <button class="btn" data-relatorio="pacientes-sem-procedimento-alto">Gerar</button>
+                <div id="rel-pacientes-alto" class="resultado"></div>
+            </div>
+        </section>
+    </main>
+
+    <div id="toasts" class="toasts"></div>
+
+    <script src="/app.js"></script>
+</body>
+</html>

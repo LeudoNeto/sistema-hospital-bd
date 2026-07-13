@@ -1,0 +1,259 @@
+:root {
+    --primaria: #0d9488;
+    --primaria-escura: #0f766e;
+    --perigo: #dc2626;
+    --perigo-escura: #b91c1c;
+    --fundo: #f1f5f9;
+    --card: #ffffff;
+    --texto: #1e293b;
+    --texto-suave: #64748b;
+    --borda: #e2e8f0;
+    --sombra: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--fundo);
+    color: var(--texto);
+    line-height: 1.5;
+    padding-bottom: 3rem;
+}
+
+.topo {
+    background: linear-gradient(135deg, var(--primaria), var(--primaria-escura));
+    color: #fff;
+    padding: 1.75rem 1.5rem;
+    text-align: center;
+}
+
+.topo h1 {
+    font-size: 1.6rem;
+}
+
+.topo p {
+    opacity: 0.9;
+    font-size: 0.95rem;
+    margin-top: 0.25rem;
+}
+
+.abas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    justify-content: center;
+    background: var(--card);
+    border-bottom: 1px solid var(--borda);
+    padding: 0.5rem;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.aba {
+    border: none;
+    background: transparent;
+    color: var(--texto-suave);
+    font-size: 0.95rem;
+    font-weight: 600;
+    padding: 0.6rem 1.1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.aba:hover {
+    background: var(--fundo);
+    color: var(--texto);
+}
+
+.aba.ativa {
+    background: var(--primaria);
+    color: #fff;
+}
+
+main {
+    max-width: 900px;
+    margin: 1.5rem auto;
+    padding: 0 1rem;
+}
+
+.painel {
+    display: none;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.painel.ativo {
+    display: flex;
+}
+
+.card {
+    background: var(--card);
+    border: 1px solid var(--borda);
+    border-radius: 12px;
+    padding: 1.4rem;
+    box-shadow: var(--sombra);
+}
+
+.card h2 {
+    font-size: 1.15rem;
+    margin-bottom: 1rem;
+    color: var(--primaria-escura);
+}
+
+.ajuda {
+    font-size: 0.85rem;
+    color: var(--texto-suave);
+    margin-top: -0.6rem;
+    margin-bottom: 1rem;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    align-items: end;
+}
+
+.form-inline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: end;
+}
+
+label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--texto-suave);
+}
+
+input {
+    font: inherit;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--borda);
+    border-radius: 8px;
+    color: var(--texto);
+    background: #fff;
+    min-width: 140px;
+}
+
+input:focus {
+    outline: none;
+    border-color: var(--primaria);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15);
+}
+
+.btn {
+    font: inherit;
+    font-weight: 600;
+    border: 1px solid var(--borda);
+    background: #fff;
+    color: var(--texto);
+    padding: 0.6rem 1.3rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+    height: fit-content;
+}
+
+.btn:hover {
+    background: var(--fundo);
+}
+
+.btn.primario {
+    background: var(--primaria);
+    border-color: var(--primaria);
+    color: #fff;
+}
+
+.btn.primario:hover {
+    background: var(--primaria-escura);
+}
+
+.btn.perigo {
+    background: var(--perigo);
+    border-color: var(--perigo);
+    color: #fff;
+}
+
+.btn.perigo:hover {
+    background: var(--perigo-escura);
+}
+
+.btn.mini {
+    padding: 0.3rem 0.7rem;
+    font-size: 0.8rem;
+}
+
+.resultado {
+    margin-top: 1rem;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+th, td {
+    text-align: left;
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid var(--borda);
+}
+
+th {
+    background: var(--fundo);
+    color: var(--texto-suave);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+tbody tr:hover {
+    background: #f8fafc;
+}
+
+.empty {
+    color: var(--texto-suave);
+    font-style: italic;
+    padding: 0.5rem 0;
+}
+
+.toasts {
+    position: fixed;
+    bottom: 1.25rem;
+    right: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    z-index: 50;
+}
+
+.toast {
+    padding: 0.8rem 1.1rem;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    animation: entrar 0.2s ease-out;
+    max-width: 340px;
+}
+
+.toast.sucesso { background: var(--primaria); }
+.toast.erro { background: var(--perigo); }
+
+@keyframes entrar {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
