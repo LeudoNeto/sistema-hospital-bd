@@ -15,6 +15,7 @@
     <nav class="abas">
         <button class="aba ativa" data-aba="atendimentos">Atendimentos</button>
         <button class="aba" data-aba="procedimentos">Procedimentos</button>
+        <button class="aba" data-aba="profissionais">Profissionais</button>
         <button class="aba" data-aba="pacientes">Pacientes</button>
         <button class="aba" data-aba="relatorios">Relatórios</button>
     </nav>
@@ -23,84 +24,43 @@
         <!-- ============================ ATENDIMENTOS ======================= -->
         <section id="atendimentos" class="painel ativo">
             <div class="card">
-                <h2>Novo atendimento</h2>
-                <form id="form-criar-atendimento" class="form-grid">
-                    <label>Data e hora
-                        <input type="datetime-local" name="data_hora" required />
-                    </label>
-                    <label>Duração (min)
-                        <input type="number" name="duracao_minutos" min="1" required />
-                    </label>
-                    <label>ID paciente
-                        <input type="number" name="id_paciente" min="1" required />
-                    </label>
-                    <label>ID residente
-                        <input type="number" name="id_residente" min="1" required />
-                    </label>
-                    <label>ID preceptor
-                        <input type="number" name="id_preceptor" min="1" required />
-                    </label>
-                    <button type="submit" class="btn primario">Cadastrar</button>
-                </form>
-            </div>
-
-            <div class="card">
-                <h2>Atendimentos de um paciente</h2>
-                <form id="form-listar-atendimentos" class="form-inline">
-                    <label>ID paciente
-                        <input type="number" name="id_paciente" min="1" required />
-                    </label>
-                    <button type="submit" class="btn">Listar</button>
-                </form>
-                <div id="resultado-atendimentos" class="resultado"></div>
+                <div class="toolbar">
+                    <form id="form-filtro-atendimentos" class="form-inline">
+                        <label>Filtrar por paciente
+                            <select name="id_paciente">
+                                <option value="">Todos os pacientes</option>
+                            </select>
+                        </label>
+                        <button type="submit" class="btn">Filtrar</button>
+                        <button type="button" id="btn-limpar-filtro" class="btn">Limpar</button>
+                    </form>
+                    <button type="button" id="btn-novo-atendimento" class="btn primario">+ Novo Atendimento</button>
+                </div>
+                <div id="tabela-atendimentos" class="resultado"></div>
             </div>
         </section>
 
         <!-- ============================ PROCEDIMENTOS ====================== -->
         <section id="procedimentos" class="painel">
             <div class="card">
-                <h2>Procedimentos de um atendimento</h2>
-                <form id="form-listar-procedimentos" class="form-inline">
-                    <label>ID atendimento
-                        <input type="number" name="id_atendimento" min="1" required />
-                    </label>
-                    <button type="submit" class="btn">Listar</button>
-                </form>
-                <div id="resultado-procedimentos" class="resultado"></div>
+                <h2>Procedimentos cadastrados</h2>
+                <div id="tabela-procedimentos" class="resultado"></div>
             </div>
+        </section>
 
+        <!-- ============================ PROFISSIONAIS ====================== -->
+        <section id="profissionais" class="painel">
             <div class="card">
-                <h2>Remover procedimento realizado</h2>
-                <p class="ajuda">Só é permitido remover procedimentos que ainda não foram faturados.</p>
-                <form id="form-remover-procedimento" class="form-inline">
-                    <label>ID atendimento
-                        <input type="number" name="id_atendimento" min="1" required />
-                    </label>
-                    <label>ID procedimento
-                        <input type="number" name="id_procedimento" min="1" required />
-                    </label>
-                    <button type="submit" class="btn perigo">Remover</button>
-                </form>
+                <h2>Profissionais cadastrados</h2>
+                <div id="tabela-profissionais" class="resultado"></div>
             </div>
         </section>
 
         <!-- ============================ PACIENTES ========================== -->
         <section id="pacientes" class="painel">
             <div class="card">
-                <h2>Atualizar dados do paciente</h2>
-                <p class="ajuda">Preencha ao menos um campo (endereço ou convênio).</p>
-                <form id="form-atualizar-paciente" class="form-grid">
-                    <label>ID paciente
-                        <input type="number" name="id_paciente" min="1" required />
-                    </label>
-                    <label>Endereço
-                        <input type="text" name="endereco" placeholder="(opcional)" />
-                    </label>
-                    <label>Convênio
-                        <input type="text" name="num_convenio" placeholder="(opcional)" />
-                    </label>
-                    <button type="submit" class="btn primario">Atualizar</button>
-                </form>
+                <h2>Pacientes cadastrados</h2>
+                <div id="tabela-pacientes" class="resultado"></div>
             </div>
         </section>
 
@@ -145,6 +105,76 @@
             </div>
         </section>
     </main>
+
+    <!-- ============================ MODAL ============================== -->
+    <div id="modal" class="modal-overlay" hidden>
+        <div class="modal-caixa" role="dialog" aria-modal="true">
+            <div class="modal-cabecalho">
+                <h2 id="modal-titulo"></h2>
+                <button type="button" id="modal-fechar" class="modal-x" aria-label="Fechar">&times;</button>
+            </div>
+            <div id="modal-corpo" class="modal-corpo"></div>
+        </div>
+    </div>
+
+    <!-- ==================== TEMPLATES (clonados nos modais) ============ -->
+    <template id="tpl-novo-atendimento">
+        <form id="form-criar-atendimento" class="form-grid">
+            <label>Data e hora
+                <input type="datetime-local" name="data_hora" required />
+            </label>
+            <label>Duração (min)
+                <input type="number" name="duracao_minutos" min="1" required />
+            </label>
+            <label>Paciente
+                <select name="id_paciente" required></select>
+            </label>
+            <label>Residente
+                <select name="id_residente" required></select>
+            </label>
+            <label>Preceptor
+                <select name="id_preceptor" required></select>
+            </label>
+            <div class="subsecao">
+                <h3>Procedimentos realizados</h3>
+                <p class="ajuda">Todo atendimento precisa de ao menos um procedimento.</p>
+                <div class="lista-procedimentos"></div>
+                <button type="button" class="btn mini btn-add-procedimento">+ Adicionar procedimento</button>
+            </div>
+            <button type="submit" class="btn primario">Cadastrar</button>
+        </form>
+    </template>
+
+    <template id="tpl-linha-procedimento">
+        <div class="linha-procedimento form-inline">
+            <label>Procedimento
+                <select name="id_procedimento" required></select>
+            </label>
+            <label>Qtd
+                <input type="number" name="quantidade" min="1" value="1" required />
+            </label>
+            <label>Tempo real (min)
+                <input type="number" name="tempo_real_minutos" min="1" required />
+            </label>
+            <label>Observação
+                <input type="text" name="observacao" placeholder="(opcional)" />
+            </label>
+            <button type="button" class="btn mini remover-linha">Remover</button>
+        </div>
+    </template>
+
+    <template id="tpl-editar-paciente">
+        <form id="form-atualizar-paciente" class="form-grid">
+            <p class="ajuda">Preencha ao menos um campo (endereço ou convênio).</p>
+            <label>Endereço
+                <input type="text" name="endereco" placeholder="(opcional)" />
+            </label>
+            <label>Convênio
+                <input type="text" name="num_convenio" placeholder="(opcional)" />
+            </label>
+            <button type="submit" class="btn primario">Salvar</button>
+        </form>
+    </template>
 
     <div id="toasts" class="toasts"></div>
 

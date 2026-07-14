@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import APIRouter, HTTPException
 
 from manager import EntidadeNaoEncontrada, Manager, OperacaoNaoPermitida
@@ -21,6 +23,8 @@ class Controller:
                 novo_id = manager.criar_atendimento(atendimento)
             except EntidadeNaoEncontrada as erro:
                 raise HTTPException(status_code=404, detail=str(erro))
+            except OperacaoNaoPermitida as erro:
+                raise HTTPException(status_code=409, detail=str(erro))
             return {"id_atendimento": novo_id}
 
         @self.router.get("/atendimentos", tags=["Atendimentos"])
@@ -76,3 +80,32 @@ class Controller:
         )
         def pacientes_sem_procedimento_alto():
             return manager.pacientes_sem_procedimento_alto()
+
+        # ==============================================================
+        # Extras para o front-end
+        # (rotas de apoio às telas do painel; não fazem parte dos
+        #  requisitos originais da Etapa 1)
+        # ==============================================================
+
+        @self.router.get("/atendimentos/lista", tags=["Extras front-end"])
+        def listar_atendimentos_com_nomes(id_paciente: Optional[int] = None):
+            return manager.listar_atendimentos_com_nomes(id_paciente)
+
+        @self.router.get(
+            "/atendimentos/{id_atendimento}/procedimentos-detalhados",
+            tags=["Extras front-end"],
+        )
+        def listar_procedimentos_realizados_detalhado(id_atendimento: int):
+            return manager.listar_procedimentos_realizados_detalhado(id_atendimento)
+
+        @self.router.get("/pacientes", tags=["Extras front-end"])
+        def listar_pacientes():
+            return manager.listar_pacientes()
+
+        @self.router.get("/procedimentos", tags=["Extras front-end"])
+        def listar_procedimentos():
+            return manager.listar_procedimentos()
+
+        @self.router.get("/profissionais", tags=["Extras front-end"])
+        def listar_profissionais():
+            return manager.listar_profissionais()

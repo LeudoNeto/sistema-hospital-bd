@@ -137,7 +137,7 @@ label {
     color: var(--texto-suave);
 }
 
-input {
+input, select {
     font: inherit;
     padding: 0.55rem 0.7rem;
     border: 1px solid var(--borda);
@@ -147,7 +147,11 @@ input {
     min-width: 140px;
 }
 
-input:focus {
+select {
+    cursor: pointer;
+}
+
+input:focus, select:focus {
     outline: none;
     border-color: var(--primaria);
     box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15);
@@ -195,8 +199,110 @@ input:focus {
     font-size: 0.8rem;
 }
 
+.subsecao {
+    grid-column: 1 / -1;
+    border-top: 1px dashed var(--borda);
+    padding-top: 1rem;
+    margin-top: 0.25rem;
+}
+
+.subsecao h3 {
+    font-size: 0.95rem;
+    color: var(--primaria-escura);
+    margin-bottom: 0.4rem;
+}
+
+.linha-procedimento {
+    background: var(--fundo);
+    border: 1px solid var(--borda);
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-bottom: 0.6rem;
+}
+
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+.col-acoes {
+    white-space: nowrap;
+    text-align: right;
+}
+
+.col-acoes .btn.mini + .btn.mini {
+    margin-left: 0.4rem;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .resultado {
     margin-top: 1rem;
+}
+
+/* ---------------------------- Modal ---------------------------------- */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 2rem 1rem;
+    overflow-y: auto;
+    z-index: 100;
+}
+
+.modal-overlay[hidden] {
+    display: none;
+}
+
+.modal-caixa {
+    background: var(--card);
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+    width: 100%;
+    max-width: 640px;
+    margin: auto 0;
+    animation: entrar 0.2s ease-out;
+}
+
+.modal-cabecalho {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.1rem 1.4rem;
+    border-bottom: 1px solid var(--borda);
+}
+
+.modal-cabecalho h2 {
+    font-size: 1.15rem;
+    color: var(--primaria-escura);
+}
+
+.modal-x {
+    border: none;
+    background: transparent;
+    font-size: 1.6rem;
+    line-height: 1;
+    color: var(--texto-suave);
+    cursor: pointer;
+    padding: 0 0.3rem;
+}
+
+.modal-x:hover {
+    color: var(--texto);
+}
+
+.modal-corpo {
+    padding: 1.4rem;
 }
 
 table {

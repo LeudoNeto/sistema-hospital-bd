@@ -29,12 +29,28 @@ class Manager:
                 f"Preceptor {atendimento.id_preceptor} não encontrado."
             )
 
-        return self.repository.inserir_atendimento(
+        # Regra: o atendimento precisa de ao menos um procedimento (garantida
+        # pelo schema Pydantic) e cada procedimento deve existir e ser único.
+        ids_procedimentos = [p.id_procedimento for p in atendimento.procedimentos]
+        if len(ids_procedimentos) != len(set(ids_procedimentos)):
+            raise OperacaoNaoPermitida(
+                "Há procedimentos repetidos para o mesmo atendimento."
+            )
+        for id_procedimento in ids_procedimentos:
+            if not self.repository.procedimento_existe(id_procedimento):
+                raise EntidadeNaoEncontrada(
+                    f"Procedimento {id_procedimento} não encontrado."
+                )
+
+        # Atendimento e seus procedimentos são gravados na mesma transação:
+        # se qualquer inserção falhar, nada é persistido.
+        return self.repository.inserir_atendimento_com_procedimentos(
             atendimento.data_hora,
             atendimento.duracao_minutos,
             atendimento.id_paciente,
             atendimento.id_residente,
             atendimento.id_preceptor,
+            atendimento.procedimentos,
         )
 
     def listar_atendimentos_por_paciente(self, id_paciente: int) -> list:
@@ -56,6 +72,14 @@ class Manager:
         if registro["is_faturado"]:
             raise OperacaoNaoPermitida(
                 "Não é possível remover: o procedimento já possui faturamento associado."
+            )
+        # Regra de negócio: todo atendimento tem ao menos um procedimento.
+        # Assim como a criação exige >= 1 procedimento, a remoção não pode
+        # deixar o atendimento sem nenhum.
+        if self.repository.contar_procedimentos_do_atendimento(id_atendimento) <= 1:
+            raise OperacaoNaoPermitida(
+                "Não é possível remover: o atendimento precisa de ao menos um "
+                "procedimento."
             )
 
         self.repository.remover_procedimento_realizado(
@@ -84,3 +108,25 @@ class Manager:
 
     def pacientes_sem_procedimento_alto(self) -> list:
         return self.repository.pacientes_sem_procedimento_alto()
+
+    # ==================================================================
+    # Extras para o front-end
+    # (delegações das listagens que alimentam as telas do painel)
+    # ==================================================================
+
+    def listar_atendimentos_com_nomes(self, id_paciente: int | None = None) -> list:
+        return self.repository.listar_atendimentos_com_nomes(id_paciente)
+
+    def listar_procedimentos_realizados_detalhado(self, id_atendimento: int) -> list:
+        return self.repository.listar_procedimentos_realizados_detalhado(
+            id_atendimento
+        )
+
+    def listar_pacientes(self) -> list:
+        return self.repository.listar_pacientes()
+
+    def listar_procedimentos(self) -> list:
+        return self.repository.listar_procedimentos()
+
+    def listar_profissionais(self) -> list:
+        return self.repository.listar_profissionais()
