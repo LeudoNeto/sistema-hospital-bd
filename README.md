@@ -46,8 +46,8 @@ Sobem três serviços: `db` (MySQL, porta 3306), `backend` (API, porta 8000) e `
 ## 3. Carregar os scripts do banco
 
 O MySQL sobe com o banco **vazio**. Carregue nesta ordem: o **schema** (criação das
-tabelas), os **dados de teste** e as **stored procedures**. Use a mesma senha definida em
-`MYSQL_PASSWORD`.
+tabelas), os **dados de teste**, as **stored procedures** e os **triggers**. Use a mesma
+senha definida em `MYSQL_PASSWORD`.
 
 > 🔴 **`--default-character-set=utf8mb4` não é opcional.** O cliente `mysql` da imagem
 > assume `latin1`, e os três scripts contêm acentos — sem a flag os bytes UTF-8 são
@@ -62,6 +62,7 @@ CARGA="docker exec -i hospital_mysql mysql --default-character-set=utf8mb4 -u ho
 $CARGA < database/schema.sql
 $CARGA < database/mock_data.sql
 $CARGA < database/procedures.sql
+$CARGA < database/triggers.sql
 ```
 
 **Windows PowerShell** (não suporta o operador `<`):
@@ -71,14 +72,27 @@ $carga = { docker exec -i hospital_mysql mysql --default-character-set=utf8mb4 -
 Get-Content database/schema.sql     -Encoding UTF8 | & $carga
 Get-Content database/mock_data.sql  -Encoding UTF8 | & $carga
 Get-Content database/procedures.sql -Encoding UTF8 | & $carga
+Get-Content database/triggers.sql   -Encoding UTF8 | & $carga
 ```
 
 > ⚠️ Carregue sempre por `stdin`, como acima. Passar texto acentuado em `mysql -e "..."`
 > não funciona no Windows: o argumento é reconvertido para a codepage ANSI antes de chegar
 > ao contêiner e os acentos são corrompidos no caminho.
 
-`procedures.sql` é idempotente (cada procedure tem `DROP PROCEDURE IF EXISTS`), então pode
-ser recarregado sozinho sempre que for alterado.
+`procedures.sql` e `triggers.sql` são idempotentes (cada objeto tem seu
+`DROP ... IF EXISTS`), então podem ser recarregados sozinhos sempre que forem alterados.
+
+> 📌 `triggers.sql` precisa vir **depois** de `schema.sql`, de onde vêm a tabela
+> `AUDITORIA_ATENDIMENTO` e a coluna `PROCEDIMENTO.media_tempo_procedimento`. Rodá-lo
+> depois de `mock_data.sql` também é intencional: no fim do arquivo há um `UPDATE` de
+> *backfill* que calcula a média inicial dos dados já carregados — triggers só valem para
+> o que acontece depois deles.
+>
+> 🔑 Criar trigger com *binary logging* ligado (o default do MySQL 8) exigiria o
+> privilégio `SUPER`, de instância, que `hospital_user` não tem. Por isso o serviço `db`
+> do `docker-compose.yml` sobe com `--log-bin-trust-function-creators=1`. Se você já
+> tinha os contêineres de pé antes desta mudança, rode `docker compose up -d db` para
+> recriar o contêiner do banco (os dados ficam no volume, não são perdidos).
 
 Conferir se os acentos foram gravados corretamente (deve sair `manhã`, não `manhÃ£`):
 
@@ -105,4 +119,28 @@ docker exec -it hospital_mysql mysql -u hospital_user -p'SUA_SENHA' hospital_db 
 docker compose down -v
 docker compose up -d --build
 # repita o passo 3 para recarregar os scripts
+```
+
+### Aplicar os objetos dos triggers num banco já carregado
+
+`schema.sql` é só `CREATE TABLE`, então não pode ser recarregado sobre um banco que já
+tem dados. Para ganhar a tabela e a coluna que `triggers.sql` exige **sem** reiniciar do
+zero, rode estes dois comandos uma única vez e depois carregue `triggers.sql`:
+
+```sql
+ALTER TABLE PROCEDIMENTO
+    ADD COLUMN media_tempo_procedimento DECIMAL(7,2) AFTER tempo_medio_minutos;
+
+CREATE TABLE AUDITORIA_ATENDIMENTO (
+    id_auditoria INT AUTO_INCREMENT,
+    id_atendimento INT NOT NULL,
+    operacao VARCHAR(10) NOT NULL,
+    usuario VARCHAR(100) NOT NULL,
+    data_hora DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    dados_antigos JSON,
+    dados_novos JSON,
+    CONSTRAINT PK_AUDITORIA_ATENDIMENTO PRIMARY KEY (id_auditoria),
+    CONSTRAINT CK_AUDITORIA_OPERACAO CHECK (operacao IN ('INSERT', 'UPDATE', 'DELETE')),
+    INDEX IX_AUDITORIA_ATENDIMENTO (id_atendimento)
+);
 ```

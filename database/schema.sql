@@ -104,6 +104,7 @@ CREATE TABLE PROCEDIMENTO (
     codigo VARCHAR(20) NOT NULL,
     nome VARCHAR(100) NOT NULL,
     tempo_medio_minutos INT NOT NULL,
+    media_tempo_procedimento DECIMAL(7,2),
     nivel_risco VARCHAR(10) NOT NULL,
     CONSTRAINT PK_PROCEDIMENTO PRIMARY KEY (id_procedimento),
     CONSTRAINT UN_PROCEDIMENTO_CODIGO UNIQUE (codigo),
@@ -148,4 +149,18 @@ CREATE TABLE ESCALA (
     CONSTRAINT CK_TURNO CHECK (turno IN ('manhã', 'tarde', 'noite')),
     CONSTRAINT CK_MES_REFERENCIA CHECK (mes_referencia BETWEEN 1 AND 12),
     CONSTRAINT CK_ANO_REFERENCIA CHECK (ano_referencia >= 2000)
+);
+
+-- 12. TABELA: AUDITORIA_ATENDIMENTO
+CREATE TABLE AUDITORIA_ATENDIMENTO (
+    id_auditoria INT AUTO_INCREMENT,
+    id_atendimento INT NOT NULL,
+    operacao VARCHAR(10) NOT NULL,
+    usuario VARCHAR(100) NOT NULL,
+    data_hora DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    dados_antigos JSON,      -- estado anterior: NULL no INSERT
+    dados_novos JSON,        -- estado posterior: NULL no DELETE
+    CONSTRAINT PK_AUDITORIA_ATENDIMENTO PRIMARY KEY (id_auditoria),
+    CONSTRAINT CK_AUDITORIA_OPERACAO CHECK (operacao IN ('INSERT', 'UPDATE', 'DELETE')),
+    INDEX IX_AUDITORIA_ATENDIMENTO (id_atendimento)
 );

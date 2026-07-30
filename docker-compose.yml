@@ -27,6 +27,7 @@ services:
     image: mysql:8.0
     container_name: hospital_mysql
     restart: on-failure
+    command: --log-bin-trust-function-creators=1
     ports:
       - "3306:3306"
     env_file: ./backend/.env
