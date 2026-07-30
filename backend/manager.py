@@ -1,12 +1,7 @@
+from erros import EntidadeNaoEncontrada, OperacaoNaoPermitida
 from repository import Repository
 
-
-class EntidadeNaoEncontrada(Exception):
-    """Erro de negócio: uma entidade referenciada não existe no banco."""
-
-
-class OperacaoNaoPermitida(Exception):
-    """Erro de negócio: a operação viola uma regra do sistema."""
+__all__ = ["EntidadeNaoEncontrada", "Manager", "OperacaoNaoPermitida"]
 
 
 class Manager:
@@ -51,6 +46,18 @@ class Manager:
             atendimento.id_residente,
             atendimento.id_preceptor,
             atendimento.procedimentos,
+            atendimento.id_unidade,
+        )
+
+    def criar_atendimento_via_procedure(self, atendimento) -> int:
+        return self.repository.registrar_atendimento_completo_sp(
+            atendimento.data_hora,
+            atendimento.duracao_minutos,
+            atendimento.id_paciente,
+            atendimento.id_residente,
+            atendimento.id_preceptor,
+            atendimento.procedimentos,
+            atendimento.id_unidade,
         )
 
     def listar_atendimentos_por_paciente(self, id_paciente: int) -> list:
@@ -109,6 +116,22 @@ class Manager:
     def pacientes_sem_procedimento_alto(self) -> list:
         return self.repository.pacientes_sem_procedimento_alto()
 
+    def tempo_medio_espera_por_unidade(
+        self, mes: int | None = None, ano: int | None = None
+    ) -> list:
+        return self.repository.tempo_medio_espera_por_unidade(mes, ano)
+
+    def reajustar_escala(self, dados) -> int:
+        return self.repository.reajustar_escala(
+            dados.id_residente,
+            dados.dia_origem,
+            dados.turno_origem,
+            dados.dia_destino,
+            dados.turno_destino,
+            dados.mes,
+            dados.ano,
+        )
+
     # ==================================================================
     # Extras para o front-end
     # (delegações das listagens que alimentam as telas do painel)
@@ -130,3 +153,9 @@ class Manager:
 
     def listar_profissionais(self) -> list:
         return self.repository.listar_profissionais()
+
+    def listar_unidades(self) -> list:
+        return self.repository.listar_unidades()
+
+    def listar_escalas(self) -> list:
+        return self.repository.listar_escalas()

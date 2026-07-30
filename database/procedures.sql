@@ -1,3 +1,8 @@
+-- Erros de negócio saem por SIGNAL SQLSTATE '45000'. O MYSQL_ERRNO distingue as
+-- duas famílias (é ele, e não o SQLSTATE, que o driver entrega ao Python):
+--   4404 -> entidade referenciada não existe  (a API responde 404)
+--   1644 -> regra de negócio violada, default (a API responde 409)
+
 DROP PROCEDURE IF EXISTS sp_registrar_atendimento_completo;
 
 DELIMITER $$
@@ -58,24 +63,24 @@ BEGIN
 
     IF NOT EXISTS (SELECT 1 FROM PACIENTE WHERE id_pessoa = p_id_paciente) THEN
         SET v_msg = CONCAT('Paciente ', IFNULL(p_id_paciente, 'NULL'), ' não encontrado.');
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_msg;
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_msg, MYSQL_ERRNO = 4404;
     END IF;
 
     IF NOT EXISTS (SELECT 1 FROM RESIDENTE WHERE id_profissional = p_id_residente) THEN
         SET v_msg = CONCAT('Residente ', IFNULL(p_id_residente, 'NULL'), ' não encontrado.');
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_msg;
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_msg, MYSQL_ERRNO = 4404;
     END IF;
 
     IF NOT EXISTS (SELECT 1 FROM PRECEPTOR WHERE id_profissional = p_id_preceptor) THEN
         SET v_msg = CONCAT('Preceptor ', IFNULL(p_id_preceptor, 'NULL'), ' não encontrado.');
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_msg;
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_msg, MYSQL_ERRNO = 4404;
     END IF;
 
     -- id_unidade é opcional; se vier preenchido, precisa existir.
     IF p_id_unidade IS NOT NULL
        AND NOT EXISTS (SELECT 1 FROM UNIDADE WHERE id_unidade = p_id_unidade) THEN
         SET v_msg = CONCAT('Unidade ', p_id_unidade, ' não encontrada.');
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_msg;
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_msg, MYSQL_ERRNO = 4404;
     END IF;
 
     -- ------------------------- escrita transacional -------------------------
@@ -103,7 +108,7 @@ BEGIN
 
         IF NOT EXISTS (SELECT 1 FROM PROCEDIMENTO WHERE id_procedimento = v_id_proc) THEN
             SET v_msg = CONCAT('Procedimento ', v_id_proc, ' não encontrado.');
-            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_msg;
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_msg, MYSQL_ERRNO = 4404;
         END IF;
 
         IF v_quantidade IS NULL OR v_quantidade <= 0 THEN
@@ -203,7 +208,7 @@ BEGIN
 
     IF NOT EXISTS (SELECT 1 FROM RESIDENTE WHERE id_profissional = p_id_residente) THEN
         SET v_msg = CONCAT('Residente ', IFNULL(p_id_residente, 'NULL'), ' não encontrado.');
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_msg;
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_msg, MYSQL_ERRNO = 4404;
     END IF;
 
     IF p_dia_origem  NOT IN ('segunda','terça','quarta','quinta','sexta','sábado','domingo')
@@ -249,7 +254,7 @@ BEGIN
 
     IF v_alvos = 0 THEN
         SET v_msg = CONCAT('Nenhuma escala do residente em ', p_dia_origem, '/', p_turno_origem, '.');
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_msg;
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_msg, MYSQL_ERRNO = 4404;
     END IF;
 
     IF v_conflitos > 0 THEN

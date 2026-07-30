@@ -49,31 +49,41 @@ O MySQL sobe com o banco **vazio**. Carregue nesta ordem: o **schema** (criaçã
 tabelas), os **dados de teste** e as **stored procedures**. Use a mesma senha definida em
 `MYSQL_PASSWORD`.
 
+> 🔴 **`--default-character-set=utf8mb4` não é opcional.** O cliente `mysql` da imagem
+> assume `latin1`, e os três scripts contêm acentos — sem a flag os bytes UTF-8 são
+> reinterpretados e gravados duplo-codificados. Isso corrompe silenciosamente os nomes, os
+> `CHECK` de `ESCALA` e os literais dentro das procedures (`'manhã'` viraria `'manhÃ£'`, e
+> `sp_reajustar_escala` passaria a recusar todo turno válido).
+
 **Linux / macOS / Git Bash:**
 
 ```bash
-docker exec -i hospital_mysql mysql -u hospital_user -p'SUA_SENHA' hospital_db < database/schema.sql
-docker exec -i hospital_mysql mysql -u hospital_user -p'SUA_SENHA' hospital_db < database/mock_data.sql
-docker exec -i hospital_mysql mysql -u hospital_user -p'SUA_SENHA' hospital_db < database/procedures.sql
+CARGA="docker exec -i hospital_mysql mysql --default-character-set=utf8mb4 -u hospital_user -p'SUA_SENHA' hospital_db"
+$CARGA < database/schema.sql
+$CARGA < database/mock_data.sql
+$CARGA < database/procedures.sql
 ```
 
 **Windows PowerShell** (não suporta o operador `<`):
 
 ```powershell
-Get-Content database/schema.sql     | docker exec -i hospital_mysql mysql -u hospital_user -p'SUA_SENHA' hospital_db
-Get-Content database/mock_data.sql  | docker exec -i hospital_mysql mysql -u hospital_user -p'SUA_SENHA' hospital_db
-Get-Content database/procedures.sql | docker exec -i hospital_mysql mysql -u hospital_user -p'SUA_SENHA' hospital_db
+$carga = { docker exec -i hospital_mysql mysql --default-character-set=utf8mb4 -u hospital_user -p'SUA_SENHA' hospital_db }
+Get-Content database/schema.sql     -Encoding UTF8 | & $carga
+Get-Content database/mock_data.sql  -Encoding UTF8 | & $carga
+Get-Content database/procedures.sql -Encoding UTF8 | & $carga
 ```
 
-> ⚠️ Os arquivos `.sql` contêm acentos. Sempre carregue-os **por `stdin`** (como acima) e
-> não via `mysql -e "..."` com texto acentuado na linha de comando — no Windows o argumento
-> é reconvertido para a codepage ANSI e os acentos chegam corrompidos ao servidor.
+> ⚠️ Carregue sempre por `stdin`, como acima. Passar texto acentuado em `mysql -e "..."`
+> não funciona no Windows: o argumento é reconvertido para a codepage ANSI antes de chegar
+> ao contêiner e os acentos são corrompidos no caminho.
 
 `procedures.sql` é idempotente (cada procedure tem `DROP PROCEDURE IF EXISTS`), então pode
-ser recarregado sozinho sempre que for alterado:
+ser recarregado sozinho sempre que for alterado.
+
+Conferir se os acentos foram gravados corretamente (deve sair `manhã`, não `manhÃ£`):
 
 ```bash
-docker exec -i hospital_mysql mysql -u hospital_user -p'SUA_SENHA' hospital_db < database/procedures.sql
+docker exec -it hospital_mysql mysql --default-character-set=utf8mb4 -u hospital_user -p'SUA_SENHA' hospital_db -e "SELECT DISTINCT turno FROM ESCALA;"
 ```
 
 Conferir a carga:

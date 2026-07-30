@@ -5,6 +5,7 @@ from urllib.parse import quote_plus
 
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
+from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session, sessionmaker
 
 load_dotenv()
@@ -62,3 +63,16 @@ def transacao() -> Generator[Session, None, None]:
         except Exception:
             sessao_atual.rollback()
             raise
+
+
+@contextmanager
+def conexao_procedure() -> Generator[Connection, None, None]:
+    """Conexão para chamar stored procedures, em AUTOCOMMIT.
+
+    As procedures controlam a própria transação (``START TRANSACTION`` ...
+       ``COMMIT``/``ROLLBACK``). O MySQL não aninha transações — se abríssemos
+       uma por fora, o ``START TRANSACTION`` de dentro faria um commit implícito
+       dela. Em AUTOCOMMIT o controle fica inteiramente com a procedure.
+    """
+    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+        yield conn

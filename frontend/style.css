@@ -199,6 +199,11 @@ input:focus, select:focus {
     font-size: 0.8rem;
 }
 
+/* Ocupa a linha inteira de um .form-grid (textos de ajuda, por exemplo). */
+.largura-total {
+    grid-column: 1 / -1;
+}
+
 .subsecao {
     grid-column: 1 / -1;
     border-top: 1px dashed var(--borda);

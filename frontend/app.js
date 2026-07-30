@@ -63,7 +63,30 @@ const ROTULOS = {
     total_atendimentos: "Total de atendimentos",
     total_plantoes: "Total de plantões",
     ano_residencia: "Ano",
+    id_escala: "ID",
+    id_unidade: "ID",
+    dia_semana: "Dia",
+    mes_referencia: "Mês",
+    ano_referencia: "Ano",
+    capacidade_leitos: "Leitos",
+    data_hora_inicio: "Início",
+    atendimentos_medidos: "Atendimentos medidos",
+    tempo_medio_espera_minutos: "Espera média (min)",
+    menor_espera_minutos: "Menor espera (min)",
+    maior_espera_minutos: "Maior espera (min)",
 };
+
+// Domínios de ESCALA, na ordem cronológica (espelham os CHECK do schema).
+const DIAS_SEMANA = [
+    "segunda",
+    "terça",
+    "quarta",
+    "quinta",
+    "sexta",
+    "sábado",
+    "domingo",
+];
+const TURNOS = ["manhã", "tarde", "noite"];
 
 function rotulo(chave) {
     if (ROTULOS[chave]) return ROTULOS[chave];
@@ -174,17 +197,37 @@ function preencherSelect(select, itens, getId, getNome, placeholder) {
 
 // Busca as listas de referência que alimentam os <select> do formulário.
 async function carregarOpcoes() {
-    const [pacientes, profissionais, procedimentos] = await Promise.all([
+    const [pacientes, profissionais, procedimentos, unidades] = await Promise.all([
         api("GET", "/pacientes"),
         api("GET", "/profissionais"),
         api("GET", "/procedimentos"),
+        api("GET", "/unidades"),
     ]);
     return {
         pacientes,
         residentes: profissionais.filter((p) => p.papel === "Residente"),
         preceptores: profissionais.filter((p) => p.papel === "Preceptor"),
         procedimentos,
+        unidades,
     };
+}
+
+// Preenche um <select> com valores que são o próprio texto (dias, turnos).
+function preencherSelectSimples(select, valores) {
+    select.innerHTML = "";
+    valores.forEach((v) => select.appendChild(opcaoSelect(v, v)));
+}
+
+/** Monta a query string ignorando os campos em branco. */
+function queryString(parametros) {
+    const busca = new URLSearchParams();
+    Object.entries(parametros).forEach(([chave, valor]) => {
+        if (valor !== "" && valor !== null && valor !== undefined) {
+            busca.append(chave, valor);
+        }
+    });
+    const texto = busca.toString();
+    return texto ? `?${texto}` : "";
 }
 
 // ======================================================================
@@ -311,6 +354,8 @@ async function abrirModalNovoAtendimento() {
     preencherSelect(form.id_paciente, opcoes.pacientes, (p) => p.id_paciente, (p) => p.nome, "Selecione…");
     preencherSelect(form.id_residente, opcoes.residentes, (p) => p.id_pessoa, (p) => p.nome, "Selecione…");
     preencherSelect(form.id_preceptor, opcoes.preceptores, (p) => p.id_pessoa, (p) => p.nome, "Selecione…");
+    // Unidade é opcional: sem ela o atendimento não entra no relatório de espera.
+    preencherSelect(form.id_unidade, opcoes.unidades, (u) => u.id_unidade, (u) => u.nome, "Não informada");
 
     const lista = form.querySelector(".lista-procedimentos");
 
@@ -349,9 +394,18 @@ async function abrirModalNovoAtendimento() {
             id_preceptor: Number(form.id_preceptor.value),
             procedimentos: coletarProcedimentos(lista),
         };
+        if (form.id_unidade.value) corpo.id_unidade = Number(form.id_unidade.value);
+
+        // As duas rotas recebem o mesmo corpo e respondem os mesmos status: a
+        // diferença é onde a transação e as validações acontecem.
+        const viaProcedure = form.motor.value === "procedure";
+        const caminho = viaProcedure ? "/atendimentos/completo" : "/atendimentos";
         try {
-            const r = await api("POST", "/atendimentos", corpo);
-            toast(`Atendimento #${r.id_atendimento} cadastrado com sucesso.`);
+            const r = await api("POST", caminho, corpo);
+            toast(
+                `Atendimento #${r.id_atendimento} cadastrado via ` +
+                    `${viaProcedure ? "stored procedure" : "ORM"}.`
+            );
             fecharModal();
             carregarAtendimentos();
         } catch (erro) {
@@ -371,6 +425,8 @@ function coletarProcedimentos(lista) {
         };
         const obs = linha.querySelector('[name="observacao"]').value.trim();
         if (obs) proc.observacao = obs;
+        const inicio = linha.querySelector('[name="data_hora_inicio"]').value;
+        if (inicio) proc.data_hora_inicio = inicio;
         return proc;
     });
 }
@@ -504,6 +560,67 @@ function abrirModalEditarPaciente(paciente) {
 }
 
 // ======================================================================
+// Escalas (listagem + reajuste de dia/turno via sp_reajustar_escala)
+// ======================================================================
+
+async function carregarEscalas() {
+    const container = document.getElementById("tabela-escalas");
+    try {
+        const linhas = await api("GET", "/escalas");
+        renderTabela(container, linhas);
+    } catch (erro) {
+        toast(erro.message, "erro");
+    }
+}
+
+document
+    .getElementById("btn-reajustar-escala")
+    .addEventListener("click", abrirModalReajustarEscala);
+
+async function abrirModalReajustarEscala() {
+    let residentes;
+    try {
+        const profissionais = await api("GET", "/profissionais");
+        residentes = profissionais.filter((p) => p.papel === "Residente");
+    } catch (erro) {
+        toast(erro.message, "erro");
+        return;
+    }
+
+    const form = clonarTemplate("tpl-reajustar-escala");
+    preencherSelect(form.id_residente, residentes, (p) => p.id_pessoa, (p) => p.nome, "Selecione…");
+    form.querySelectorAll(".select-dia").forEach((s) => preencherSelectSimples(s, DIAS_SEMANA));
+    form.querySelectorAll(".select-turno").forEach((s) => preencherSelectSimples(s, TURNOS));
+
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const corpo = {
+            id_residente: Number(form.id_residente.value),
+            dia_origem: form.dia_origem.value,
+            turno_origem: form.turno_origem.value,
+            dia_destino: form.dia_destino.value,
+            turno_destino: form.turno_destino.value,
+        };
+        // Em branco = todos os meses (a procedure trata NULL como curinga).
+        if (form.mes.value) corpo.mes = Number(form.mes.value);
+        if (form.ano.value) corpo.ano = Number(form.ano.value);
+
+        try {
+            const r = await api("POST", "/escalas/reajustar", corpo);
+            const plural = r.escalas_movidas === 1 ? "escala" : "escalas";
+            toast(`${r.escalas_movidas} ${plural} reajustada(s) com sucesso.`);
+            fecharModal();
+            carregarEscalas();
+        } catch (erro) {
+            // Conflito, domínio inválido e "nada a mover" vêm da procedure.
+            toast(erro.message, "erro");
+        }
+    });
+
+    abrirModal("Reajustar dia/turno das escalas", form);
+}
+
+// ======================================================================
 // Relatórios
 // ======================================================================
 
@@ -544,6 +661,24 @@ document
         }
     });
 
+// sp_calcular_tempo_medio_espera — mês/ano em branco = todo o período.
+document
+    .getElementById("form-tempo-espera")
+    .addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const { mes, ano } = dadosDoForm(e.target);
+        const container = document.getElementById("rel-tempo-espera");
+        try {
+            const linhas = await api(
+                "GET",
+                `/relatorios/tempo-medio-espera${queryString({ mes, ano })}`
+            );
+            renderTabela(container, linhas, null, ["id_unidade"]);
+        } catch (erro) {
+            toast(erro.message, "erro");
+        }
+    });
+
 // ======================================================================
 // Inicialização
 // ======================================================================
@@ -553,6 +688,7 @@ const LOADERS = {
     procedimentos: carregarProcedimentos,
     profissionais: carregarProfissionais,
     pacientes: carregarPacientes,
+    escalas: carregarEscalas,
 };
 
 popularFiltroPacientes(); // opções do filtro por paciente

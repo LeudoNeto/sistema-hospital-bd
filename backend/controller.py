@@ -2,8 +2,9 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 
-from manager import EntidadeNaoEncontrada, Manager, OperacaoNaoPermitida
-from schemas import AtendimentoCreate, PacienteUpdate
+from erros import EntidadeNaoEncontrada, OperacaoNaoPermitida
+from manager import Manager
+from schemas import AtendimentoCreate, EscalaReajuste, PacienteUpdate
 
 
 class Controller:
@@ -21,6 +22,18 @@ class Controller:
         def criar_atendimento(atendimento: AtendimentoCreate):
             try:
                 novo_id = manager.criar_atendimento(atendimento)
+            except EntidadeNaoEncontrada as erro:
+                raise HTTPException(status_code=404, detail=str(erro))
+            except OperacaoNaoPermitida as erro:
+                raise HTTPException(status_code=409, detail=str(erro))
+            return {"id_atendimento": novo_id}
+
+        @self.router.post(
+            "/atendimentos/completo", status_code=201, tags=["Atendimentos"]
+        )
+        def criar_atendimento_via_procedure(atendimento: AtendimentoCreate):
+            try:
+                novo_id = manager.criar_atendimento_via_procedure(atendimento)
             except EntidadeNaoEncontrada as erro:
                 raise HTTPException(status_code=404, detail=str(erro))
             except OperacaoNaoPermitida as erro:
@@ -81,6 +94,26 @@ class Controller:
         def pacientes_sem_procedimento_alto():
             return manager.pacientes_sem_procedimento_alto()
 
+        @self.router.get("/relatorios/tempo-medio-espera", tags=["Relatórios"])
+        def tempo_medio_espera_por_unidade(
+            mes: Optional[int] = None, ano: Optional[int] = None
+        ):
+            return manager.tempo_medio_espera_por_unidade(mes, ano)
+
+        @self.router.get("/escalas", tags=["Escalas"])
+        def listar_escalas():
+            return manager.listar_escalas()
+
+        @self.router.post("/escalas/reajustar", tags=["Escalas"])
+        def reajustar_escala(dados: EscalaReajuste):
+            try:
+                movidas = manager.reajustar_escala(dados)
+            except EntidadeNaoEncontrada as erro:
+                raise HTTPException(status_code=404, detail=str(erro))
+            except OperacaoNaoPermitida as erro:
+                raise HTTPException(status_code=409, detail=str(erro))
+            return {"escalas_movidas": movidas}
+
         # ==============================================================
         # Extras para o front-end
         # (rotas de apoio às telas do painel; não fazem parte dos
@@ -109,3 +142,7 @@ class Controller:
         @self.router.get("/profissionais", tags=["Extras front-end"])
         def listar_profissionais():
             return manager.listar_profissionais()
+
+        @self.router.get("/unidades", tags=["Extras front-end"])
+        def listar_unidades():
+            return manager.listar_unidades()

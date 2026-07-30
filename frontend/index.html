@@ -17,6 +17,7 @@
         <button class="aba" data-aba="procedimentos">Procedimentos</button>
         <button class="aba" data-aba="profissionais">Profissionais</button>
         <button class="aba" data-aba="pacientes">Pacientes</button>
+        <button class="aba" data-aba="escalas">Escalas</button>
         <button class="aba" data-aba="relatorios">Relatórios</button>
     </nav>
 
@@ -64,6 +65,19 @@
             </div>
         </section>
 
+        <!-- ============================ ESCALAS ============================ -->
+        <section id="escalas" class="painel">
+            <div class="card">
+                <div class="toolbar">
+                    <h2>Escalas de plantão</h2>
+                    <button type="button" id="btn-reajustar-escala" class="btn primario">
+                        Reajustar dia/turno
+                    </button>
+                </div>
+                <div id="tabela-escalas" class="resultado"></div>
+            </div>
+        </section>
+
         <!-- ============================ RELATÓRIOS ========================= -->
         <section id="relatorios" class="painel">
             <div class="card">
@@ -103,6 +117,24 @@
                 <button class="btn" data-relatorio="pacientes-sem-procedimento-alto">Gerar</button>
                 <div id="rel-pacientes-alto" class="resultado"></div>
             </div>
+
+            <div class="card">
+                <h2>Tempo médio de espera por unidade</h2>
+                <p class="ajuda">
+                    Da chegada do paciente até o início do primeiro procedimento.
+                    Deixe mês e ano em branco para considerar todo o período.
+                </p>
+                <form id="form-tempo-espera" class="form-inline">
+                    <label>Mês
+                        <input type="number" name="mes" min="1" max="12" placeholder="todos" />
+                    </label>
+                    <label>Ano
+                        <input type="number" name="ano" min="2000" placeholder="todos" />
+                    </label>
+                    <button type="submit" class="btn">Gerar</button>
+                </form>
+                <div id="rel-tempo-espera" class="resultado"></div>
+            </div>
         </section>
     </main>
 
@@ -135,6 +167,16 @@
             <label>Preceptor
                 <select name="id_preceptor" required></select>
             </label>
+            <label>Unidade
+                <select name="id_unidade"></select>
+            </label>
+            <label title="sp_registrar_atendimento_completo (banco) ou SQLAlchemy (Python)">
+                Gravar via
+                <select name="motor">
+                    <option value="procedure">Stored procedure</option>
+                    <option value="orm">ORM</option>
+                </select>
+            </label>
             <div class="subsecao">
                 <h3>Procedimentos realizados</h3>
                 <p class="ajuda">Todo atendimento precisa de ao menos um procedimento.</p>
@@ -156,11 +198,47 @@
             <label>Tempo real (min)
                 <input type="number" name="tempo_real_minutos" min="1" required />
             </label>
+            <label>Início
+                <input type="datetime-local" name="data_hora_inicio" />
+            </label>
             <label>Observação
                 <input type="text" name="observacao" placeholder="(opcional)" />
             </label>
             <button type="button" class="btn mini remover-linha">Remover</button>
         </div>
+    </template>
+
+    <template id="tpl-reajustar-escala">
+        <form id="form-reajustar-escala" class="form-grid">
+            <p class="ajuda largura-total">
+                Move <strong>todas</strong> as escalas do residente do dia/turno de origem
+                para o de destino. Se qualquer uma delas gerar conflito (mesma unidade, dia,
+                turno e mês), <strong>nenhuma</strong> é movida.
+                Mês e ano em branco alcançam todos os meses.
+            </p>
+            <label>Residente
+                <select name="id_residente" required></select>
+            </label>
+            <label>Dia de origem
+                <select name="dia_origem" class="select-dia" required></select>
+            </label>
+            <label>Turno de origem
+                <select name="turno_origem" class="select-turno" required></select>
+            </label>
+            <label>Dia de destino
+                <select name="dia_destino" class="select-dia" required></select>
+            </label>
+            <label>Turno de destino
+                <select name="turno_destino" class="select-turno" required></select>
+            </label>
+            <label>Mês de referência
+                <input type="number" name="mes" min="1" max="12" placeholder="todos" />
+            </label>
+            <label>Ano de referência
+                <input type="number" name="ano" min="2000" placeholder="todos" />
+            </label>
+            <button type="submit" class="btn primario">Reajustar</button>
+        </form>
     </template>
 
     <template id="tpl-editar-paciente">
