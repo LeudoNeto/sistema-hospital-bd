@@ -45,21 +45,35 @@ Sobem três serviços: `db` (MySQL, porta 3306), `backend` (API, porta 8000) e `
 
 ## 3. Carregar os scripts do banco
 
-O MySQL sobe com o banco **vazio**. Carregue primeiro o **schema** (criação das tabelas) e
-depois os **dados de teste**. Use a mesma senha definida em `MYSQL_PASSWORD`.
+O MySQL sobe com o banco **vazio**. Carregue nesta ordem: o **schema** (criação das
+tabelas), os **dados de teste** e as **stored procedures**. Use a mesma senha definida em
+`MYSQL_PASSWORD`.
 
 **Linux / macOS / Git Bash:**
 
 ```bash
 docker exec -i hospital_mysql mysql -u hospital_user -p'SUA_SENHA' hospital_db < database/schema.sql
 docker exec -i hospital_mysql mysql -u hospital_user -p'SUA_SENHA' hospital_db < database/mock_data.sql
+docker exec -i hospital_mysql mysql -u hospital_user -p'SUA_SENHA' hospital_db < database/procedures.sql
 ```
 
 **Windows PowerShell** (não suporta o operador `<`):
 
 ```powershell
-Get-Content database/schema.sql    | docker exec -i hospital_mysql mysql -u hospital_user -p'SUA_SENHA' hospital_db
-Get-Content database/mock_data.sql | docker exec -i hospital_mysql mysql -u hospital_user -p'SUA_SENHA' hospital_db
+Get-Content database/schema.sql     | docker exec -i hospital_mysql mysql -u hospital_user -p'SUA_SENHA' hospital_db
+Get-Content database/mock_data.sql  | docker exec -i hospital_mysql mysql -u hospital_user -p'SUA_SENHA' hospital_db
+Get-Content database/procedures.sql | docker exec -i hospital_mysql mysql -u hospital_user -p'SUA_SENHA' hospital_db
+```
+
+> ⚠️ Os arquivos `.sql` contêm acentos. Sempre carregue-os **por `stdin`** (como acima) e
+> não via `mysql -e "..."` com texto acentuado na linha de comando — no Windows o argumento
+> é reconvertido para a codepage ANSI e os acentos chegam corrompidos ao servidor.
+
+`procedures.sql` é idempotente (cada procedure tem `DROP PROCEDURE IF EXISTS`), então pode
+ser recarregado sozinho sempre que for alterado:
+
+```bash
+docker exec -i hospital_mysql mysql -u hospital_user -p'SUA_SENHA' hospital_db < database/procedures.sql
 ```
 
 Conferir a carga:

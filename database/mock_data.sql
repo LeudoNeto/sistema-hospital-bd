@@ -73,55 +73,59 @@ INSERT INTO PROCEDIMENTO (id_procedimento, codigo, nome, tempo_medio_minutos, ni
 (7, 'P007', 'Reanimação Cardiopulmonar', 45, 'alto');
 
 -- 8. 10 atendimentos
-INSERT INTO ATENDIMENTO (id_atendimento, data_hora, duracao_minutos, id_paciente, id_residente, id_preceptor) VALUES 
-(1, '2024-10-20 08:30:00', 45, 1, 6, 11),
-(2, '2024-10-20 09:15:00', 60, 2, 7, 12),
-(3, '2024-10-20 10:00:00', 30, 3, 8, 13),
-(4, '2024-10-21 14:00:00', 120, 4, 9, 14),
-(5, '2024-10-21 15:30:00', 40, 5, 10, 15),
-(6, '2024-10-22 08:00:00', 50, 1, 6, 11),
-(7, '2024-10-22 11:45:00', 25, 2, 8, 13),
-(8, '2024-10-23 16:20:00', 90, 3, 7, 12),
-(9, '2024-10-24 19:10:00', 35, 4, 9, 14),
-(10, '2024-10-25 21:00:00', 45, 5, 10, 15),
-(11, '2026-07-01 08:00:00', 60, 1, 6, 11),
-(12, '2026-07-02 09:00:00', 90, 2, 6, 11),
-(13, '2026-07-03 10:00:00', 30, 3, 6, 11),
-(14, '2026-07-04 08:30:00', 45, 1, 6, 11),
-(15, '2026-07-05 11:00:00', 40, 4, 6, 11),
-(16, '2026-07-06 14:00:00', 50, 5, 6, 11),
-(17, '2026-07-07 08:00:00', 120, 2, 7, 12),
-(18, '2026-07-08 09:30:00', 30, 3, 7, 12),
-(19, '2026-07-09 10:00:00', 25, 4, 7, 12),
-(20, '2026-07-10 08:00:00', 35, 5, 8, 13),
-(21, '2026-07-10 13:00:00', 40, 3, 8, 13),
-(22, '2026-07-11 09:00:00', 55, 4, 9, 14);
+INSERT INTO ATENDIMENTO (id_atendimento, data_hora, duracao_minutos, id_paciente, id_residente, id_preceptor, id_unidade) VALUES
+(1, '2024-10-20 08:30:00', 45, 1, 6, 11, 1),
+(2, '2024-10-20 09:15:00', 60, 2, 7, 12, 1),
+(3, '2024-10-20 10:00:00', 30, 3, 8, 13, 3),
+(4, '2024-10-21 14:00:00', 120, 4, 9, 14, 2),
+(5, '2024-10-21 15:30:00', 40, 5, 10, 15, 2),
+(6, '2024-10-22 08:00:00', 50, 1, 6, 11, 1),
+(7, '2024-10-22 11:45:00', 25, 2, 8, 13, 3),
+(8, '2024-10-23 16:20:00', 90, 3, 7, 12, 1),
+(9, '2024-10-24 19:10:00', 35, 4, 9, 14, 2),
+(10, '2024-10-25 21:00:00', 45, 5, 10, 15, 2),
+(11, '2026-07-01 08:00:00', 60, 1, 6, 11, 1),
+(12, '2026-07-02 09:00:00', 90, 2, 6, 11, 1),
+(13, '2026-07-03 10:00:00', 30, 3, 6, 11, 1),
+(14, '2026-07-04 08:30:00', 45, 1, 6, 11, 1),
+(15, '2026-07-05 11:00:00', 40, 4, 6, 11, 1),
+(16, '2026-07-06 14:00:00', 50, 5, 6, 11, 1),
+(17, '2026-07-07 08:00:00', 120, 2, 7, 12, 1),
+(18, '2026-07-08 09:30:00', 30, 3, 7, 12, 1),
+(19, '2026-07-09 10:00:00', 25, 4, 7, 12, 1),
+(20, '2026-07-10 08:00:00', 35, 5, 8, 13, 3),
+(21, '2026-07-10 13:00:00', 40, 3, 8, 13, 3),
+(22, '2026-07-11 09:00:00', 55, 4, 9, 14, 2);
 
 -- 9. 10 procedimentos realizados
-INSERT INTO PROCEDIMENTO_REALIZADO (id_atendimento, id_procedimento, quantidade, tempo_real_minutos, observacao, is_faturado) VALUES
-(1, 1, 1, 35, 'Sutura de 3 pontos no braço direito.', TRUE),
-(1, 5, 2, 12, 'Paciente relatou leve ardência.', TRUE),
-(2, 4, 1, 20, 'Imagem com boa nitidez.', TRUE),
-(3, 2, 1, 10, 'Acesso venoso difícil, necessário duas tentativas.', FALSE),
-(4, 3, 1, 25, 'Alteração leve detectada, encaminhado para especialista.', TRUE),
-(4, 5, 1, 10, 'Sem intercorrências.', FALSE),
-(5, 2, 1, 15, 'Coleta padrão.', TRUE),
-(6, 1, 1, 40, 'Sutura extensa na perna.', TRUE),
-(8, 4, 1, 30, 'Paciente com dificuldade de mobilidade.', FALSE),
-(10, 3, 1, 18, 'Exame de rotina.', TRUE),
-(11, 6, 1, 185, 'Cirurgia de emergência após trauma (paciente 1).', TRUE),
-(11, 5, 2, 12, 'Medicação intravenosa no pós-operatório.', TRUE),
-(12, 7, 1, 50, 'Reanimação cardiopulmonar bem-sucedida (paciente 2).', TRUE),
-(13, 2, 1, 14, 'Coleta de rotina.', FALSE),
-(14, 1, 1, 32, 'Sutura no couro cabeludo.', TRUE),
-(15, 3, 1, 22, 'ECG sem alterações.', TRUE),
-(16, 4, 1, 26, 'Raio-X de controle.', FALSE),
-(17, 1, 1, 38, 'Sutura em membro inferior.', TRUE),
-(18, 5, 1, 11, 'Antibiótico intravenoso.', TRUE),
-(19, 2, 1, 15, 'Coleta para exames laboratoriais.', FALSE),
-(20, 3, 1, 19, 'Eletrocardiograma de rotina.', TRUE),
-(21, 4, 1, 27, 'Raio-X de tórax.', TRUE),
-(22, 5, 1, 10, 'Hidratação intravenosa.', FALSE);
+--    data_hora_inicio é o começo da execução. A diferença entre ela e o
+--    data_hora do atendimento é a espera do paciente — curta no Pronto-Socorro
+--    e na UTI, mais longa na Enfermaria. O registro (4, 5) fica sem horário de
+--    propósito: procedimento sem hora não entra no cálculo da espera.
+INSERT INTO PROCEDIMENTO_REALIZADO (id_atendimento, id_procedimento, quantidade, tempo_real_minutos, data_hora_inicio, observacao, is_faturado) VALUES
+(1, 1, 1, 35, '2024-10-20 08:40:00', 'Sutura de 3 pontos no braço direito.', TRUE),
+(1, 5, 2, 12, '2024-10-20 09:20:00', 'Paciente relatou leve ardência.', TRUE),
+(2, 4, 1, 20, '2024-10-20 09:23:00', 'Imagem com boa nitidez.', TRUE),
+(3, 2, 1, 10, '2024-10-20 10:25:00', 'Acesso venoso difícil, necessário duas tentativas.', FALSE),
+(4, 3, 1, 25, '2024-10-21 14:05:00', 'Alteração leve detectada, encaminhado para especialista.', TRUE),
+(4, 5, 1, 10, NULL, 'Sem intercorrências.', FALSE),
+(5, 2, 1, 15, '2024-10-21 15:33:00', 'Coleta padrão.', TRUE),
+(6, 1, 1, 40, '2024-10-22 08:12:00', 'Sutura extensa na perna.', TRUE),
+(8, 4, 1, 30, '2024-10-23 16:29:00', 'Paciente com dificuldade de mobilidade.', FALSE),
+(10, 3, 1, 18, '2024-10-25 21:04:00', 'Exame de rotina.', TRUE),
+(11, 6, 1, 185, '2026-07-01 08:07:00', 'Cirurgia de emergência após trauma (paciente 1).', TRUE),
+(11, 5, 2, 12, '2026-07-01 11:20:00', 'Medicação intravenosa no pós-operatório.', TRUE),
+(12, 7, 1, 50, '2026-07-02 09:02:00', 'Reanimação cardiopulmonar bem-sucedida (paciente 2).', TRUE),
+(13, 2, 1, 14, '2026-07-03 10:14:00', 'Coleta de rotina.', FALSE),
+(14, 1, 1, 32, '2026-07-04 08:41:00', 'Sutura no couro cabeludo.', TRUE),
+(15, 3, 1, 22, '2026-07-05 11:06:00', 'ECG sem alterações.', TRUE),
+(16, 4, 1, 26, '2026-07-06 14:13:00', 'Raio-X de controle.', FALSE),
+(17, 1, 1, 38, '2026-07-07 08:09:00', 'Sutura em membro inferior.', TRUE),
+(18, 5, 1, 11, '2026-07-08 09:35:00', 'Antibiótico intravenoso.', TRUE),
+(19, 2, 1, 15, '2026-07-09 10:16:00', 'Coleta para exames laboratoriais.', FALSE),
+(20, 3, 1, 19, '2026-07-10 08:32:00', 'Eletrocardiograma de rotina.', TRUE),
+(21, 4, 1, 27, '2026-07-10 13:38:00', 'Raio-X de tórax.', TRUE),
+(22, 5, 1, 10, '2026-07-11 09:06:00', 'Hidratação intravenosa.', FALSE);
 
 -- 10. Histórico profissional (papéis ao longo do tempo)
 INSERT INTO HISTORICO_PROFISSIONAL (id_historico, id_profissional, papel, data_inicio, data_fim) VALUES

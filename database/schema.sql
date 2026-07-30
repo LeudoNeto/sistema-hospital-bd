@@ -86,13 +86,16 @@ CREATE TABLE ATENDIMENTO (
     id_paciente INT NOT NULL,
     id_residente INT NOT NULL,
     id_preceptor INT NOT NULL,
+    id_unidade INT,
     CONSTRAINT PK_ATENDIMENTO PRIMARY KEY (id_atendimento),
-    CONSTRAINT FK_ATENDIMENTO_PACIENTE FOREIGN KEY (id_paciente) 
+    CONSTRAINT FK_ATENDIMENTO_PACIENTE FOREIGN KEY (id_paciente)
         REFERENCES PACIENTE(id_pessoa),
-    CONSTRAINT FK_ATENDIMENTO_RESIDENTE FOREIGN KEY (id_residente) 
+    CONSTRAINT FK_ATENDIMENTO_RESIDENTE FOREIGN KEY (id_residente)
         REFERENCES RESIDENTE(id_profissional),
     CONSTRAINT FK_ATENDIMENTO_PRECEPTOR FOREIGN KEY (id_preceptor)
-        REFERENCES PRECEPTOR(id_profissional)
+        REFERENCES PRECEPTOR(id_profissional),
+    CONSTRAINT FK_ATENDIMENTO_UNIDADE FOREIGN KEY (id_unidade)
+        REFERENCES UNIDADE(id_unidade)
 );
 
 -- 9. TABELA: PROCEDIMENTO
@@ -113,6 +116,7 @@ CREATE TABLE PROCEDIMENTO_REALIZADO (
     id_procedimento INT,
     quantidade INT NOT NULL DEFAULT 1,
     tempo_real_minutos INT NOT NULL,
+    data_hora_inicio DATETIME,
     observacao TEXT,
     is_faturado BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT PK_PROCEDIMENTO_REALIZADO PRIMARY KEY (id_atendimento, id_procedimento),

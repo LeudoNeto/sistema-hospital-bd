@@ -133,6 +133,7 @@ class Unidade(Base):
     capacidade_leitos: Mapped[int] = mapped_column(nullable=False, default=0)
 
     escalas: Mapped[list["Escala"]] = relationship(back_populates="unidade")
+    atendimentos: Mapped[list["Atendimento"]] = relationship(back_populates="unidade")
 
     def __repr__(self) -> str:
         return f"<Unidade id={self.id_unidade} nome={self.nome!r}>"
@@ -153,13 +154,12 @@ class Atendimento(Base):
     id_preceptor: Mapped[int] = mapped_column(
         ForeignKey("PRECEPTOR.id_profissional"), nullable=False
     )
+    id_unidade: Mapped[Optional[int]] = mapped_column(ForeignKey("UNIDADE.id_unidade"))
 
     paciente: Mapped["Paciente"] = relationship(back_populates="atendimentos")
     residente: Mapped["Residente"] = relationship(back_populates="atendimentos")
     preceptor: Mapped["Preceptor"] = relationship(back_populates="atendimentos")
-    # cascade "all, delete-orphan": os procedimentos realizados são filhos do
-    # atendimento — entram na mesma transação ao serem anexados à coleção e são
-    # apagados junto com o pai.
+    unidade: Mapped[Optional["Unidade"]] = relationship(back_populates="atendimentos")
     procedimentos_realizados: Mapped[list["ProcedimentoRealizado"]] = relationship(
         back_populates="atendimento", cascade="all, delete-orphan"
     )
@@ -199,6 +199,7 @@ class ProcedimentoRealizado(Base):
     )
     quantidade: Mapped[int] = mapped_column(nullable=False, default=1)
     tempo_real_minutos: Mapped[int] = mapped_column(nullable=False)
+    data_hora_inicio: Mapped[Optional[datetime]] = mapped_column(DateTime)
     observacao: Mapped[Optional[str]] = mapped_column(Text)
     is_faturado: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
