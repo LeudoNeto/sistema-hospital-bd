@@ -2,8 +2,8 @@
 
 Instruções de instalação, execução e carga do banco de dados.
 
-Stack: **MySQL 8**, **Python 3.12 + FastAPI** (SQL puro, sem ORM) e frontend servido por
-**Nginx**, tudo orquestrado por **Docker Compose**.
+Stack: **MySQL 8**, **Python 3.12 + FastAPI** com **SQLAlchemy 2.0 (ORM)** e frontend
+servido por **Nginx**, tudo orquestrado por **Docker Compose**.
 
 ---
 
@@ -24,6 +24,10 @@ cp backend/.env.example backend/.env
 Edite `backend/.env` e troque as senhas (`MYSQL_ROOT_PASSWORD` e `MYSQL_PASSWORD`). Os
 demais valores podem permanecer como no exemplo — `MYSQL_HOST=hospital_mysql` é o nome do
 contêiner do MySQL e é assim que o backend o encontra na rede do Docker.
+
+> 💡 `SQL_ECHO=true` faz a SQLAlchemy imprimir no log do contêiner todo SQL que ela gera
+> (`docker compose logs -f backend`). Útil para ver as consultas da ORM — inclusive as
+> consultas extras disparadas pelo *lazy loading*.
 
 ## 2. Subir os contêineres
 

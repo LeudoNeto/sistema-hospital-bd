@@ -1,55 +1,44 @@
-from database import get_conexao
+from sqlalchemy import extract, func, select
+from sqlalchemy.orm import contains_eager, joinedload, selectinload
+
+from database import sessao, transacao
+from models import (
+    Atendimento,
+    Base,
+    Escala,
+    Paciente,
+    Pessoa,
+    Preceptor,
+    Procedimento,
+    ProcedimentoRealizado,
+    Profissional,
+    Residente,
+    Unidade,
+)
+
+# Colunas de PACIENTE que a API permite atualizar (protege o setattr dinâmico).
+CAMPOS_EDITAVEIS_PACIENTE = frozenset({"endereco", "num_convenio"})
 
 
 class Repository:
-    """Consultas SQL (pymysql) do sistema hospitalar."""
+    """Consultas e persistência do sistema hospitalar via SQLAlchemy ORM."""
+
+    def _existe(self, entidade: type[Base], chave) -> bool:
+        with sessao() as s:
+            return s.get(entidade, chave) is not None
 
     def paciente_existe(self, id_paciente: int) -> bool:
-        conexao = get_conexao()
-        try:
-            with conexao.cursor() as cursor:
-                cursor.execute(
-                    "SELECT 1 FROM PACIENTE WHERE id_pessoa = %s", (id_paciente,)
-                )
-                return cursor.fetchone() is not None
-        finally:
-            conexao.close()
+        return self._existe(Paciente, id_paciente)
 
     def residente_existe(self, id_residente: int) -> bool:
-        conexao = get_conexao()
-        try:
-            with conexao.cursor() as cursor:
-                cursor.execute(
-                    "SELECT 1 FROM RESIDENTE WHERE id_profissional = %s",
-                    (id_residente,),
-                )
-                return cursor.fetchone() is not None
-        finally:
-            conexao.close()
+        return self._existe(Residente, id_residente)
 
     def preceptor_existe(self, id_preceptor: int) -> bool:
-        conexao = get_conexao()
-        try:
-            with conexao.cursor() as cursor:
-                cursor.execute(
-                    "SELECT 1 FROM PRECEPTOR WHERE id_profissional = %s",
-                    (id_preceptor,),
-                )
-                return cursor.fetchone() is not None
-        finally:
-            conexao.close()
+        return self._existe(Preceptor, id_preceptor)
 
     def procedimento_existe(self, id_procedimento: int) -> bool:
-        conexao = get_conexao()
-        try:
-            with conexao.cursor() as cursor:
-                cursor.execute(
-                    "SELECT 1 FROM PROCEDIMENTO WHERE id_procedimento = %s",
-                    (id_procedimento,),
-                )
-                return cursor.fetchone() is not None
-        finally:
-            conexao.close()
+        return self._existe(Procedimento, id_procedimento)
+
 
     def inserir_atendimento_com_procedimentos(
         self,
@@ -62,243 +51,214 @@ class Repository:
     ) -> int:
         """Insere o atendimento e seus procedimentos numa única transação.
 
-        Garante a regra "todo atendimento tem ao menos um procedimento":
-        se a inserção de qualquer procedimento falhar, o atendimento também
-        é desfeito (rollback).
+        Garante a regra "todo atendimento tem ao menos um procedimento": o
+        ``transacao()`` faz rollback se qualquer inserção falhar, desfazendo
+        também o atendimento.
         """
-        conexao = get_conexao()
-        try:
-            with conexao.cursor() as cursor:
-                cursor.execute(
-                    """
-                    INSERT INTO ATENDIMENTO
-                        (data_hora, duracao_minutos, id_paciente, id_residente, id_preceptor)
-                    VALUES (%s, %s, %s, %s, %s)
-                    """,
-                    (
-                        data_hora,
-                        duracao_minutos,
-                        id_paciente,
-                        id_residente,
-                        id_preceptor,
-                    ),
-                )
-                novo_id = cursor.lastrowid
-
-                cursor.executemany(
-                    """
-                    INSERT INTO PROCEDIMENTO_REALIZADO
-                        (id_atendimento, id_procedimento, quantidade,
-                         tempo_real_minutos, observacao)
-                    VALUES (%s, %s, %s, %s, %s)
-                    """,
-                    [
-                        (
-                            novo_id,
-                            p.id_procedimento,
-                            p.quantidade,
-                            p.tempo_real_minutos,
-                            p.observacao,
-                        )
-                        for p in procedimentos
-                    ],
-                )
-            conexao.commit()
-            return novo_id
-        except Exception:
-            conexao.rollback()
-            raise
-        finally:
-            conexao.close()
-
-    def listar_atendimentos_por_paciente(self, id_paciente: int) -> list:
-        conexao = get_conexao()
-        try:
-            with conexao.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT id_atendimento, data_hora, duracao_minutos,
-                           id_paciente, id_residente, id_preceptor
-                    FROM ATENDIMENTO
-                    WHERE id_paciente = %s
-                    ORDER BY data_hora
-                    """,
-                    (id_paciente,),
-                )
-                return cursor.fetchall()
-        finally:
-            conexao.close()
-
-    def listar_procedimentos_realizados(self, id_atendimento: int) -> list:
-        conexao = get_conexao()
-        try:
-            with conexao.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT p.nome, pr.quantidade, pr.tempo_real_minutos
-                    FROM PROCEDIMENTO_REALIZADO pr
-                    JOIN PROCEDIMENTO p ON p.id_procedimento = pr.id_procedimento
-                    WHERE pr.id_atendimento = %s
-                    """,
-                    (id_atendimento,),
-                )
-                return cursor.fetchall()
-        finally:
-            conexao.close()
-
-    def buscar_procedimento_realizado(
-        self, id_atendimento: int, id_procedimento: int
-    ) -> dict | None:
-        conexao = get_conexao()
-        try:
-            with conexao.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT is_faturado
-                    FROM PROCEDIMENTO_REALIZADO
-                    WHERE id_atendimento = %s AND id_procedimento = %s
-                    """,
-                    (id_atendimento, id_procedimento),
-                )
-                return cursor.fetchone()
-        finally:
-            conexao.close()
+        with transacao() as s:
+            atendimento = Atendimento(
+                data_hora=data_hora,
+                duracao_minutos=duracao_minutos,
+                id_paciente=id_paciente,
+                id_residente=id_residente,
+                id_preceptor=id_preceptor,
+                procedimentos_realizados=[
+                    ProcedimentoRealizado(
+                        id_procedimento=p.id_procedimento,
+                        quantidade=p.quantidade,
+                        tempo_real_minutos=p.tempo_real_minutos,
+                        observacao=p.observacao,
+                    )
+                    for p in procedimentos
+                ],
+            )
+            s.add(atendimento)
+            s.flush()
+            return atendimento.id_atendimento
 
     def remover_procedimento_realizado(
         self, id_atendimento: int, id_procedimento: int
     ) -> None:
-        conexao = get_conexao()
-        try:
-            with conexao.cursor() as cursor:
-                cursor.execute(
-                    """
-                    DELETE FROM PROCEDIMENTO_REALIZADO
-                    WHERE id_atendimento = %s AND id_procedimento = %s
-                    """,
-                    (id_atendimento, id_procedimento),
-                )
-            conexao.commit()
-        finally:
-            conexao.close()
+        with transacao() as s:
+            registro = s.get(ProcedimentoRealizado, (id_atendimento, id_procedimento))
+            if registro is not None:
+                s.delete(registro)
 
     def atualizar_paciente(self, id_paciente: int, campos: dict) -> None:
-        atribuicoes = ", ".join(f"{coluna} = %s" for coluna in campos)
-        valores = list(campos.values()) + [id_paciente]
-        conexao = get_conexao()
-        try:
-            with conexao.cursor() as cursor:
-                cursor.execute(
-                    f"UPDATE PACIENTE SET {atribuicoes} WHERE id_pessoa = %s",
-                    valores,
-                )
-            conexao.commit()
-        finally:
-            conexao.close()
+        desconhecidos = set(campos) - CAMPOS_EDITAVEIS_PACIENTE
+        if desconhecidos:
+            raise ValueError(f"Campos não editáveis: {sorted(desconhecidos)}")
+
+        with transacao() as s:
+            paciente = s.get(Paciente, id_paciente)
+            if paciente is None:
+                return
+            for coluna, valor in campos.items():
+                setattr(paciente, coluna, valor)
+
+
+    def listar_atendimentos_por_paciente(self, id_paciente: int) -> list:
+        with sessao() as s:
+            consulta = (
+                select(Atendimento)
+                .where(Atendimento.id_paciente == id_paciente)
+                .order_by(Atendimento.data_hora)
+            )
+            return [
+                {
+                    "id_atendimento": a.id_atendimento,
+                    "data_hora": a.data_hora,
+                    "duracao_minutos": a.duracao_minutos,
+                    "id_paciente": a.id_paciente,
+                    "id_residente": a.id_residente,
+                    "id_preceptor": a.id_preceptor,
+                }
+                for a in s.scalars(consulta)
+            ]
+
+    def listar_procedimentos_realizados(self, id_atendimento: int) -> list:
+        with sessao() as s:
+            consulta = (
+                select(ProcedimentoRealizado)
+                .where(ProcedimentoRealizado.id_atendimento == id_atendimento)
+                .options(joinedload(ProcedimentoRealizado.procedimento))
+            )
+            return [
+                {
+                    "nome": pr.procedimento.nome,
+                    "quantidade": pr.quantidade,
+                    "tempo_real_minutos": pr.tempo_real_minutos,
+                }
+                for pr in s.scalars(consulta).unique()
+            ]
+
+    def buscar_procedimento_realizado(
+        self, id_atendimento: int, id_procedimento: int
+    ) -> dict | None:
+        with sessao() as s:
+            registro = s.get(ProcedimentoRealizado, (id_atendimento, id_procedimento))
+            if registro is None:
+                return None
+            return {"is_faturado": registro.is_faturado}
+
+    def contar_procedimentos_do_atendimento(self, id_atendimento: int) -> int:
+        with sessao() as s:
+            consulta = (
+                select(func.count())
+                .select_from(ProcedimentoRealizado)
+                .where(ProcedimentoRealizado.id_atendimento == id_atendimento)
+            )
+            return s.scalar(consulta) or 0
+
 
     def tempo_medio_por_residente(self) -> list:
-        conexao = get_conexao()
-        try:
-            with conexao.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT pe.nome,
-                           ROUND(AVG(a.duracao_minutos), 2) AS tempo_medio_minutos
-                    FROM ATENDIMENTO a
-                    JOIN PESSOA pe ON pe.id_pessoa = a.id_residente
-                    GROUP BY a.id_residente, pe.nome
-                    ORDER BY tempo_medio_minutos DESC
-                    """
-                )
-                return cursor.fetchall()
-        finally:
-            conexao.close()
+        with sessao() as s:
+            tempo_medio = func.round(func.avg(Atendimento.duracao_minutos), 2).label(
+                "tempo_medio_minutos"
+            )
+            consulta = (
+                select(Pessoa.nome, tempo_medio)
+                .join(Pessoa, Pessoa.id_pessoa == Atendimento.id_residente)
+                .group_by(Atendimento.id_residente, Pessoa.nome)
+                .order_by(tempo_medio.desc())
+            )
+            return [
+                {
+                    "nome": linha.nome,
+                    "tempo_medio_minutos": float(linha.tempo_medio_minutos),
+                }
+                for linha in s.execute(consulta)
+            ]
 
     def ranking_residentes(self) -> list:
-        conexao = get_conexao()
-        try:
-            with conexao.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT pe.nome,
-                           COUNT(a.id_atendimento) AS total_atendimentos
-                    FROM RESIDENTE r
-                    JOIN PESSOA pe ON pe.id_pessoa = r.id_profissional
-                    LEFT JOIN ATENDIMENTO a ON a.id_residente = r.id_profissional
-                    GROUP BY r.id_profissional, pe.nome
-                    ORDER BY total_atendimentos DESC
-                    """
+        with sessao() as s:
+            total = func.count(Atendimento.id_atendimento).label("total_atendimentos")
+            consulta = (
+                select(Pessoa.nome, total)
+                .select_from(Residente)
+                .join(Pessoa, Pessoa.id_pessoa == Residente.id_profissional)
+                .outerjoin(
+                    Atendimento, Atendimento.id_residente == Residente.id_profissional
                 )
-                return cursor.fetchall()
-        finally:
-            conexao.close()
+                .group_by(Residente.id_profissional, Pessoa.nome)
+                .order_by(total.desc())
+            )
+            return [
+                {"nome": linha.nome, "total_atendimentos": linha.total_atendimentos}
+                for linha in s.execute(consulta)
+            ]
 
     def preceptores_supervisao(self, mes: int, ano: int) -> list:
-        conexao = get_conexao()
-        try:
-            with conexao.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT pe.nome,
-                           COUNT(*) AS total_atendimentos
-                    FROM ATENDIMENTO a
-                    JOIN PESSOA pe ON pe.id_pessoa = a.id_preceptor
-                    WHERE MONTH(a.data_hora) = %s AND YEAR(a.data_hora) = %s
-                    GROUP BY a.id_preceptor, pe.nome
-                    HAVING COUNT(*) > 5
-                    ORDER BY total_atendimentos DESC
-                    """,
-                    (mes, ano),
+        with sessao() as s:
+            total = func.count().label("total_atendimentos")
+            consulta = (
+                select(Pessoa.nome, total)
+                .select_from(Atendimento)
+                .join(Pessoa, Pessoa.id_pessoa == Atendimento.id_preceptor)
+                .where(
+                    extract("month", Atendimento.data_hora) == mes,
+                    extract("year", Atendimento.data_hora) == ano,
                 )
-                return cursor.fetchall()
-        finally:
-            conexao.close()
+                .group_by(Atendimento.id_preceptor, Pessoa.nome)
+                .having(total > 5)
+                .order_by(total.desc())
+            )
+            return [
+                {"nome": linha.nome, "total_atendimentos": linha.total_atendimentos}
+                for linha in s.execute(consulta)
+            ]
 
     def plantoes_por_unidade(self) -> list:
-        conexao = get_conexao()
-        try:
-            with conexao.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT u.nome AS unidade,
-                           pe.nome AS residente,
-                           COUNT(*) AS total_plantoes
-                    FROM ESCALA e
-                    JOIN UNIDADE u ON u.id_unidade = e.id_unidade
-                    JOIN PESSOA pe ON pe.id_pessoa = e.id_residente
-                    WHERE e.mes_referencia = MONTH(CURDATE())
-                      AND e.ano_referencia = YEAR(CURDATE())
-                    GROUP BY u.id_unidade, u.nome, e.id_residente, pe.nome
-                    ORDER BY u.nome, total_plantoes DESC
-                    """
+        with sessao() as s:
+            hoje = func.curdate()
+            total = func.count().label("total_plantoes")
+            consulta = (
+                select(
+                    Unidade.nome.label("unidade"),
+                    Pessoa.nome.label("residente"),
+                    total,
                 )
-                return cursor.fetchall()
-        finally:
-            conexao.close()
+                .select_from(Escala)
+                .join(Unidade, Unidade.id_unidade == Escala.id_unidade)
+                .join(Pessoa, Pessoa.id_pessoa == Escala.id_residente)
+                .where(
+                    Escala.mes_referencia == extract("month", hoje),
+                    Escala.ano_referencia == extract("year", hoje),
+                )
+                .group_by(
+                    Unidade.id_unidade, Unidade.nome, Escala.id_residente, Pessoa.nome
+                )
+                .order_by(Unidade.nome, total.desc())
+            )
+            return [
+                {
+                    "unidade": linha.unidade,
+                    "residente": linha.residente,
+                    "total_plantoes": linha.total_plantoes,
+                }
+                for linha in s.execute(consulta)
+            ]
 
     def pacientes_sem_procedimento_alto(self) -> list:
-        conexao = get_conexao()
-        try:
-            with conexao.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT pe.id_pessoa AS id_paciente, pe.nome
-                    FROM PACIENTE pac
-                    JOIN PESSOA pe ON pe.id_pessoa = pac.id_pessoa
-                    WHERE pac.id_pessoa NOT IN (
-                        SELECT a.id_paciente
-                        FROM ATENDIMENTO a
-                        JOIN PROCEDIMENTO_REALIZADO pr
-                            ON pr.id_atendimento = a.id_atendimento
-                        JOIN PROCEDIMENTO p
-                            ON p.id_procedimento = pr.id_procedimento
-                        WHERE p.nivel_risco = 'alto'
+        with sessao() as s:
+            fez_procedimento_de_alto_risco = Paciente.atendimentos.any(
+                Atendimento.procedimentos_realizados.any(
+                    ProcedimentoRealizado.procedimento.has(
+                        Procedimento.nivel_risco == "alto"
                     )
-                    ORDER BY pe.nome
-                    """
                 )
-                return cursor.fetchall()
-        finally:
-            conexao.close()
+            )
+            consulta = (
+                select(Pessoa.id_pessoa.label("id_paciente"), Pessoa.nome)
+                .select_from(Paciente)
+                .join(Pessoa, Pessoa.id_pessoa == Paciente.id_pessoa)
+                .where(~fez_procedimento_de_alto_risco)
+                .order_by(Pessoa.nome)
+            )
+            return [
+                {"id_paciente": linha.id_paciente, "nome": linha.nome}
+                for linha in s.execute(consulta)
+            ]
 
     # ==================================================================
     # Extras para o front-end
@@ -312,113 +272,89 @@ class Repository:
         Sem ``id_paciente`` retorna todos; com ``id_paciente`` filtra por
         paciente. Usada pela tabela e pelo filtro da aba Atendimentos.
         """
-        conexao = get_conexao()
-        try:
-            with conexao.cursor() as cursor:
-                consulta = """
-                    SELECT a.id_atendimento,
-                           a.data_hora,
-                           a.duracao_minutos,
-                           pac.nome  AS paciente,
-                           res.nome  AS residente,
-                           prec.nome AS preceptor
-                    FROM ATENDIMENTO a
-                    JOIN PESSOA pac  ON pac.id_pessoa  = a.id_paciente
-                    JOIN PESSOA res  ON res.id_pessoa  = a.id_residente
-                    JOIN PESSOA prec ON prec.id_pessoa = a.id_preceptor
-                """
-                parametros = ()
-                if id_paciente is not None:
-                    consulta += " WHERE a.id_paciente = %s"
-                    parametros = (id_paciente,)
-                consulta += " ORDER BY a.data_hora"
-                cursor.execute(consulta, parametros)
-                return cursor.fetchall()
-        finally:
-            conexao.close()
+        with sessao() as s:
+            consulta = select(Atendimento).options(
+                joinedload(Atendimento.paciente).joinedload(Paciente.pessoa),
+                joinedload(Atendimento.residente)
+                .joinedload(Residente.profissional)
+                .joinedload(Profissional.pessoa),
+                joinedload(Atendimento.preceptor)
+                .joinedload(Preceptor.profissional)
+                .joinedload(Profissional.pessoa),
+            )
+            if id_paciente is not None:
+                consulta = consulta.where(Atendimento.id_paciente == id_paciente)
+            consulta = consulta.order_by(Atendimento.data_hora)
+
+            return [
+                {
+                    "id_atendimento": a.id_atendimento,
+                    "data_hora": a.data_hora,
+                    "duracao_minutos": a.duracao_minutos,
+                    "paciente": a.paciente.pessoa.nome,
+                    "residente": a.residente.profissional.pessoa.nome,
+                    "preceptor": a.preceptor.profissional.pessoa.nome,
+                }
+                for a in s.scalars(consulta).unique()
+            ]
 
     def listar_procedimentos_realizados_detalhado(self, id_atendimento: int) -> list:
         """Igual à listagem original, porém com ``id_procedimento`` e
         ``is_faturado`` — o front precisa deles para montar/habilitar o
-        botão de exclusão no modal."""
-        conexao = get_conexao()
-        try:
-            with conexao.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT pr.id_procedimento,
-                           p.nome,
-                           pr.quantidade,
-                           pr.tempo_real_minutos,
-                           pr.observacao,
-                           pr.is_faturado
-                    FROM PROCEDIMENTO_REALIZADO pr
-                    JOIN PROCEDIMENTO p ON p.id_procedimento = pr.id_procedimento
-                    WHERE pr.id_atendimento = %s
-                    ORDER BY p.nome
-                    """,
-                    (id_atendimento,),
-                )
-                return cursor.fetchall()
-        finally:
-            conexao.close()
-
-    def contar_procedimentos_do_atendimento(self, id_atendimento: int) -> int:
-        """Usada para impedir a remoção do último procedimento de um
-        atendimento (regra: todo atendimento tem ao menos um)."""
-        conexao = get_conexao()
-        try:
-            with conexao.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT COUNT(*) AS total
-                    FROM PROCEDIMENTO_REALIZADO
-                    WHERE id_atendimento = %s
-                    """,
-                    (id_atendimento,),
-                )
-                return cursor.fetchone()["total"]
-        finally:
-            conexao.close()
+        botão de exclusão no modal.
+        """
+        with sessao() as s:
+            consulta = (
+                select(ProcedimentoRealizado)
+                .join(ProcedimentoRealizado.procedimento)
+                .where(ProcedimentoRealizado.id_atendimento == id_atendimento)
+                .options(contains_eager(ProcedimentoRealizado.procedimento))
+                .order_by(Procedimento.nome)
+            )
+            return [
+                {
+                    "id_procedimento": pr.id_procedimento,
+                    "nome": pr.procedimento.nome,
+                    "quantidade": pr.quantidade,
+                    "tempo_real_minutos": pr.tempo_real_minutos,
+                    "observacao": pr.observacao,
+                    "is_faturado": pr.is_faturado,
+                }
+                for pr in s.scalars(consulta).unique()
+            ]
 
     def listar_pacientes(self) -> list:
-        conexao = get_conexao()
-        try:
-            with conexao.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT pe.id_pessoa AS id_paciente,
-                           pe.nome,
-                           pac.num_convenio,
-                           pac.grupo_sanguineo,
-                           pac.alergias,
-                           pac.endereco
-                    FROM PACIENTE pac
-                    JOIN PESSOA pe ON pe.id_pessoa = pac.id_pessoa
-                    """
-                )
-                return cursor.fetchall()
-        finally:
-            conexao.close()
+        with sessao() as s:
+            consulta = (
+                select(Paciente)
+                .options(joinedload(Paciente.pessoa))
+                .order_by(Paciente.id_pessoa)
+            )
+            return [
+                {
+                    "id_paciente": pac.id_pessoa,
+                    "nome": pac.pessoa.nome,
+                    "num_convenio": pac.num_convenio,
+                    "grupo_sanguineo": pac.grupo_sanguineo,
+                    "alergias": pac.alergias,
+                    "endereco": pac.endereco,
+                }
+                for pac in s.scalars(consulta).unique()
+            ]
 
     def listar_procedimentos(self) -> list:
-        conexao = get_conexao()
-        try:
-            with conexao.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT id_procedimento,
-                           codigo,
-                           nome,
-                           tempo_medio_minutos,
-                           nivel_risco
-                    FROM PROCEDIMENTO
-                    ORDER BY codigo
-                    """
-                )
-                return cursor.fetchall()
-        finally:
-            conexao.close()
+        with sessao() as s:
+            consulta = select(Procedimento).order_by(Procedimento.codigo)
+            return [
+                {
+                    "id_procedimento": proc.id_procedimento,
+                    "codigo": proc.codigo,
+                    "nome": proc.nome,
+                    "tempo_medio_minutos": proc.tempo_medio_minutos,
+                    "nivel_risco": proc.nivel_risco,
+                }
+                for proc in s.scalars(consulta)
+            ]
 
     def listar_profissionais(self) -> list:
         """Lista os profissionais com o papel atual (Residente/Preceptor).
@@ -426,28 +362,34 @@ class Repository:
         O detalhe traz ``ano_residencia`` para residentes e ``titulacao``
         para preceptores.
         """
-        conexao = get_conexao()
-        try:
-            with conexao.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT pe.id_pessoa,
-                           pe.nome,
-                           pr.CRM,
-                           pr.especialidade,
-                           pr.data_admissao,
-                           CASE
-                               WHEN res.id_profissional IS NOT NULL THEN 'Residente'
-                               WHEN prec.id_profissional IS NOT NULL THEN 'Preceptor'
-                               ELSE '—'
-                           END AS papel,
-                           COALESCE(res.ano_residencia, prec.titulacao) AS detalhe
-                    FROM PROFISSIONAL pr
-                    JOIN PESSOA pe ON pe.id_pessoa = pr.id_pessoa
-                    LEFT JOIN RESIDENTE res  ON res.id_profissional  = pr.id_pessoa
-                    LEFT JOIN PRECEPTOR prec ON prec.id_profissional = pr.id_pessoa
-                    """
+        with sessao() as s:
+            consulta = (
+                select(Profissional)
+                .options(
+                    joinedload(Profissional.pessoa),
+                    selectinload(Profissional.residente),
+                    selectinload(Profissional.preceptor),
                 )
-                return cursor.fetchall()
-        finally:
-            conexao.close()
+                .order_by(Profissional.id_pessoa)
+            )
+
+            linhas = []
+            for prof in s.scalars(consulta).unique():
+                if prof.residente is not None:
+                    papel, detalhe = "Residente", prof.residente.ano_residencia
+                elif prof.preceptor is not None:
+                    papel, detalhe = "Preceptor", prof.preceptor.titulacao
+                else:
+                    papel, detalhe = "—", None
+                linhas.append(
+                    {
+                        "id_pessoa": prof.id_pessoa,
+                        "nome": prof.pessoa.nome,
+                        "CRM": prof.crm,
+                        "especialidade": prof.especialidade,
+                        "data_admissao": prof.data_admissao,
+                        "papel": papel,
+                        "detalhe": detalhe,
+                    }
+                )
+            return linhas
