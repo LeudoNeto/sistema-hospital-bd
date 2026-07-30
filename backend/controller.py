@@ -4,7 +4,13 @@ from fastapi import APIRouter, HTTPException
 
 from erros import EntidadeNaoEncontrada, OperacaoNaoPermitida
 from manager import Manager
-from schemas import AtendimentoCreate, EscalaCreate, EscalaReajuste, PacienteUpdate
+from schemas import (
+    AtendimentoCreate,
+    AtendimentoUpdate,
+    EscalaCreate,
+    EscalaReajuste,
+    PacienteUpdate,
+)
 
 
 class Controller:
@@ -43,6 +49,23 @@ class Controller:
         @self.router.get("/atendimentos", tags=["Atendimentos"])
         def listar_atendimentos_por_paciente(id_paciente: int):
             return manager.listar_atendimentos_por_paciente(id_paciente)
+
+        @self.router.patch("/atendimentos/{id_atendimento}", tags=["Atendimentos"])
+        def atualizar_atendimento(id_atendimento: int, dados: AtendimentoUpdate):
+            try:
+                atualizado = manager.atualizar_atendimento(id_atendimento, dados)
+            except EntidadeNaoEncontrada as erro:
+                raise HTTPException(status_code=404, detail=str(erro))
+            return {"id_atendimento": id_atendimento, **atualizado}
+
+        @self.router.delete(
+            "/atendimentos/{id_atendimento}", status_code=204, tags=["Atendimentos"]
+        )
+        def remover_atendimento(id_atendimento: int):
+            try:
+                manager.remover_atendimento(id_atendimento)
+            except EntidadeNaoEncontrada as erro:
+                raise HTTPException(status_code=404, detail=str(erro))
 
         @self.router.get(
             "/atendimentos/{id_atendimento}/procedimentos",

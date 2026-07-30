@@ -1,7 +1,7 @@
 import json
 from contextlib import contextmanager
 
-from sqlalchemy import extract, func, select
+from sqlalchemy import extract, func, select, update
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import aliased, contains_eager, joinedload, selectinload
 
@@ -24,6 +24,11 @@ from models import (
 
 # Colunas de PACIENTE que a API permite atualizar (protege o setattr dinâmico).
 CAMPOS_EDITAVEIS_PACIENTE = frozenset({"endereco", "num_convenio"})
+
+# Idem para ATENDIMENTO. id_paciente não entra: ver AtendimentoUpdate.
+CAMPOS_EDITAVEIS_ATENDIMENTO = frozenset(
+    {"data_hora", "duracao_minutos", "id_residente", "id_preceptor", "id_unidade"}
+)
 
 # Ordem cronológica dos domínios de ESCALA (os valores são garantidos pelos
 # CHECK da tabela; aqui servem só para ordenar a listagem).
@@ -82,6 +87,9 @@ class Repository:
 
     def unidade_existe(self, id_unidade: int) -> bool:
         return self._existe(Unidade, id_unidade)
+
+    def atendimento_existe(self, id_atendimento: int) -> bool:
+        return self._existe(Atendimento, id_atendimento)
 
     def escala_existe(self, id_escala: int) -> bool:
         return self._existe(Escala, id_escala)
@@ -261,6 +269,45 @@ class Repository:
             registro = s.get(ProcedimentoRealizado, (id_atendimento, id_procedimento))
             if registro is not None:
                 s.delete(registro)
+
+    def atualizar_atendimento(self, id_atendimento: int, campos: dict) -> None:
+        desconhecidos = set(campos) - CAMPOS_EDITAVEIS_ATENDIMENTO
+        if desconhecidos:
+            raise ValueError(f"Campos não editáveis: {sorted(desconhecidos)}")
+
+        with transacao() as s:
+            atendimento = s.get(Atendimento, id_atendimento)
+            if atendimento is None:
+                return
+            for coluna, valor in campos.items():
+                setattr(atendimento, coluna, valor)
+
+    def remover_atendimento(self, id_atendimento: int) -> None:
+        with transacao() as s:
+            atendimento = s.get(Atendimento, id_atendimento)
+            if atendimento is None:
+                return
+
+            afetados = [
+                pr.id_procedimento for pr in atendimento.procedimentos_realizados
+            ]
+            s.delete(atendimento)
+            s.flush()
+
+            if afetados:
+                media = (
+                    select(func.round(func.avg(ProcedimentoRealizado.tempo_real_minutos), 2))
+                    .where(
+                        ProcedimentoRealizado.id_procedimento
+                        == Procedimento.id_procedimento
+                    )
+                    .scalar_subquery()
+                )
+                s.execute(
+                    update(Procedimento)
+                    .where(Procedimento.id_procedimento.in_(afetados))
+                    .values(media_tempo_procedimento=media)
+                )
 
     def atualizar_paciente(self, id_paciente: int, campos: dict) -> None:
         desconhecidos = set(campos) - CAMPOS_EDITAVEIS_PACIENTE
@@ -557,6 +604,9 @@ class Repository:
                     "paciente": a.paciente.pessoa.nome,
                     "residente": a.residente.profissional.pessoa.nome,
                     "preceptor": a.preceptor.profissional.pessoa.nome,
+                    "id_residente": a.id_residente,
+                    "id_preceptor": a.id_preceptor,
+                    "id_unidade": a.id_unidade,
                 }
                 for a in s.scalars(consulta).unique()
             ]

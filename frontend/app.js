@@ -330,12 +330,29 @@ async function carregarAtendimentos() {
     const container = document.getElementById("tabela-atendimentos");
     try {
         const linhas = await api("GET", caminho);
-        renderTabela(container, linhas, (linha) => [
-            {
-                rotulo: "Ver procedimentos",
-                aoClicar: () => verProcedimentos(linha.id_atendimento),
-            },
-        ]);
+        renderTabela(
+            container,
+            linhas,
+            (linha) => [
+                {
+                    rotulo: "Ver procedimentos",
+                    aoClicar: () => verProcedimentos(linha.id_atendimento),
+                },
+                {
+                    rotulo: "Editar",
+                    aoClicar: () => abrirModalEditarAtendimento(linha),
+                },
+                {
+                    rotulo: "Excluir",
+                    classe: "perigo",
+                    titulo: "Remove o atendimento e seus procedimentos realizados",
+                    aoClicar: () => excluirAtendimento(linha),
+                },
+            ],
+            // Ids que o formulário de edição usa, mas que a tabela não mostra
+            // (as colunas de nome já cobrem a leitura).
+            ["id_residente", "id_preceptor", "id_unidade"]
+        );
     } catch (erro) {
         toast(erro.message, "erro");
     }
@@ -446,6 +463,70 @@ function coletarProcedimentos(lista) {
         if (inicio) proc.data_hora_inicio = inicio;
         return proc;
     });
+}
+
+// --- Modal: Editar atendimento (gera a trilha de UPDATE) ---
+async function abrirModalEditarAtendimento(atendimento) {
+    let opcoes;
+    try {
+        opcoes = await carregarOpcoes();
+    } catch (erro) {
+        toast(erro.message, "erro");
+        return;
+    }
+
+    const form = clonarTemplate("tpl-editar-atendimento");
+    preencherSelect(form.id_residente, opcoes.residentes, (p) => p.id_pessoa, (p) => p.nome);
+    preencherSelect(form.id_preceptor, opcoes.preceptores, (p) => p.id_pessoa, (p) => p.nome);
+    preencherSelect(form.id_unidade, opcoes.unidades, (u) => u.id_unidade, (u) => u.nome, "Não informada");
+
+    // O input datetime-local aceita "AAAA-MM-DDTHH:MM" — o ISO da API vem com
+    // segundos, que precisam ser cortados.
+    form.data_hora.value = (atendimento.data_hora || "").slice(0, 16);
+    form.duracao_minutos.value = atendimento.duracao_minutos;
+    form.id_residente.value = atendimento.id_residente;
+    form.id_preceptor.value = atendimento.id_preceptor;
+    form.id_unidade.value = atendimento.id_unidade === null ? "" : atendimento.id_unidade;
+
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        // Manda os cinco campos editáveis; a ORM só emite UPDATE para o que
+        // realmente mudou, então submeter sem alterar nada não gera trilha.
+        const corpo = {
+            data_hora: form.data_hora.value,
+            duracao_minutos: Number(form.duracao_minutos.value),
+            id_residente: Number(form.id_residente.value),
+            id_preceptor: Number(form.id_preceptor.value),
+            id_unidade: form.id_unidade.value ? Number(form.id_unidade.value) : null,
+        };
+        try {
+            await api("PATCH", `/atendimentos/${atendimento.id_atendimento}`, corpo);
+            toast(`Atendimento #${atendimento.id_atendimento} atualizado com sucesso.`);
+            fecharModal();
+            carregarAtendimentos();
+        } catch (erro) {
+            toast(erro.message, "erro");
+        }
+    });
+
+    abrirModal(`Editar atendimento #${atendimento.id_atendimento}`, form);
+}
+
+async function excluirAtendimento(atendimento) {
+    const confirmado = confirm(
+        `Excluir o atendimento #${atendimento.id_atendimento} ` +
+            `(${atendimento.paciente}) e todos os seus procedimentos realizados?\n\n` +
+            "A exclusão fica registrada no histórico de alterações."
+    );
+    if (!confirmado) return;
+
+    try {
+        await api("DELETE", `/atendimentos/${atendimento.id_atendimento}`);
+        toast(`Atendimento #${atendimento.id_atendimento} excluído.`);
+        carregarAtendimentos();
+    } catch (erro) {
+        toast(erro.message, "erro");
+    }
 }
 
 // --- Modal: Ver procedimentos de um atendimento ---

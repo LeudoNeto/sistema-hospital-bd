@@ -93,6 +93,43 @@ class Manager:
             id_atendimento, id_procedimento
         )
 
+    def atualizar_atendimento(self, id_atendimento: int, dados) -> dict:
+        if not self.repository.atendimento_existe(id_atendimento):
+            raise EntidadeNaoEncontrada(
+                f"Atendimento {id_atendimento} não encontrado."
+            )
+
+        campos = dados.model_dump(exclude_unset=True)
+
+        if campos.get("id_residente") is not None and not self.repository.residente_existe(
+            campos["id_residente"]
+        ):
+            raise EntidadeNaoEncontrada(
+                f"Residente {campos['id_residente']} não encontrado."
+            )
+        if campos.get("id_preceptor") is not None and not self.repository.preceptor_existe(
+            campos["id_preceptor"]
+        ):
+            raise EntidadeNaoEncontrada(
+                f"Preceptor {campos['id_preceptor']} não encontrado."
+            )
+        if campos.get("id_unidade") is not None and not self.repository.unidade_existe(
+            campos["id_unidade"]
+        ):
+            raise EntidadeNaoEncontrada(
+                f"Unidade {campos['id_unidade']} não encontrada."
+            )
+
+        self.repository.atualizar_atendimento(id_atendimento, campos)
+        return campos
+
+    def remover_atendimento(self, id_atendimento: int) -> None:
+        if not self.repository.atendimento_existe(id_atendimento):
+            raise EntidadeNaoEncontrada(
+                f"Atendimento {id_atendimento} não encontrado."
+            )
+        self.repository.remover_atendimento(id_atendimento)
+
     def atualizar_paciente(self, id_paciente: int, dados) -> dict:
         if not self.repository.paciente_existe(id_paciente):
             raise EntidadeNaoEncontrada(f"Paciente {id_paciente} não encontrado.")

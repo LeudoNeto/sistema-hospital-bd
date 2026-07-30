@@ -28,6 +28,25 @@ class AtendimentoCreate(BaseModel):
     procedimentos: list[ProcedimentoRealizadoCreate] = Field(min_length=1)
 
 
+class AtendimentoUpdate(BaseModel):
+    data_hora: Optional[datetime] = None
+    duracao_minutos: Optional[int] = Field(default=None, gt=0)
+    id_residente: Optional[int] = None
+    id_preceptor: Optional[int] = None
+    # Único campo que aceita null como valor: o atendimento pode não ter
+    # unidade. Por isso o PATCH olha os campos *enviados*, não os não-nulos.
+    id_unidade: Optional[int] = None
+
+    @model_validator(mode="after")
+    def pelo_menos_um_campo(self):
+        if not self.model_fields_set:
+            raise ValueError(
+                "Informe ao menos um campo para atualizar: 'data_hora', "
+                "'duracao_minutos', 'id_residente', 'id_preceptor' ou 'id_unidade'."
+            )
+        return self
+
+
 class EscalaCreate(BaseModel):
     id_unidade: int
     dia_semana: DiaSemana

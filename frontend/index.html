@@ -230,6 +230,33 @@
         </div>
     </template>
 
+    <template id="tpl-editar-atendimento">
+        <form id="form-editar-atendimento" class="form-grid">
+            <p class="ajuda largura-total">
+                Cada campo alterado entra no histórico com o valor antigo e o novo,
+                gravado pelo trigger <code>trg_audita_atendimento</code>. O paciente não é
+                editável: trocá-lo não seria corrigir este atendimento, e sim reatribuir
+                o registro a outra pessoa.
+            </p>
+            <label>Data e hora
+                <input type="datetime-local" name="data_hora" required />
+            </label>
+            <label>Duração (min)
+                <input type="number" name="duracao_minutos" min="1" required />
+            </label>
+            <label>Residente
+                <select name="id_residente" required></select>
+            </label>
+            <label>Preceptor
+                <select name="id_preceptor" required></select>
+            </label>
+            <label>Unidade
+                <select name="id_unidade"></select>
+            </label>
+            <button type="submit" class="btn primario">Salvar</button>
+        </form>
+    </template>
+
     <template id="tpl-nova-escala">
         <form id="form-criar-escala" class="form-grid">
             <p class="ajuda largura-total">
