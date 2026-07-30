@@ -35,7 +35,13 @@
                         <button type="submit" class="btn">Filtrar</button>
                         <button type="button" id="btn-limpar-filtro" class="btn">Limpar</button>
                     </form>
-                    <button type="button" id="btn-novo-atendimento" class="btn primario">+ Novo Atendimento</button>
+                    <div class="acoes-toolbar">
+                        <button type="button" id="btn-historico-auditoria" class="btn"
+                                title="Trilha gravada por trg_audita_atendimento">
+                            Histórico de alterações
+                        </button>
+                        <button type="button" id="btn-novo-atendimento" class="btn primario">+ Novo Atendimento</button>
+                    </div>
                 </div>
                 <div id="tabela-atendimentos" class="resultado"></div>
             </div>
@@ -70,9 +76,14 @@
             <div class="card">
                 <div class="toolbar">
                     <h2>Escalas de plantão</h2>
-                    <button type="button" id="btn-reajustar-escala" class="btn primario">
-                        Reajustar dia/turno
-                    </button>
+                    <div class="acoes-toolbar">
+                        <button type="button" id="btn-reajustar-escala" class="btn">
+                            Reajustar dia/turno
+                        </button>
+                        <button type="button" id="btn-nova-escala" class="btn primario">
+                            + Nova escala
+                        </button>
+                    </div>
                 </div>
                 <div id="tabela-escalas" class="resultado"></div>
             </div>
@@ -116,6 +127,17 @@
                 <h2>Pacientes sem procedimento de risco alto</h2>
                 <button class="btn" data-relatorio="pacientes-sem-procedimento-alto">Gerar</button>
                 <div id="rel-pacientes-alto" class="resultado"></div>
+            </div>
+
+            <div class="card">
+                <h2>Tempo previsto x tempo observado por procedimento</h2>
+                <p class="ajuda">
+                    O tempo estimado é o do cadastro do procedimento. A média observada é
+                    calculada sobre o tempo real das realizações e mantida pelo trigger
+                    <code>trg_atualiza_media_procedimentos</code>.
+                </p>
+                <button class="btn" data-relatorio="tempos-observados-procedimentos">Gerar</button>
+                <div id="rel-tempos-observados" class="resultado"></div>
             </div>
 
             <div class="card">
@@ -206,6 +228,39 @@
             </label>
             <button type="button" class="btn mini remover-linha">Remover</button>
         </div>
+    </template>
+
+    <template id="tpl-nova-escala">
+        <form id="form-criar-escala" class="form-grid">
+            <p class="ajuda largura-total">
+                O banco recusa a gravação em dois casos: a repetição exata (mesmo residente,
+                mesma unidade, mesmo dia/turno/mês), barrada pela <em>UNIQUE</em> da tabela;
+                e o mesmo residente no mesmo dia/turno em <strong>outra</strong> unidade,
+                barrado pelo trigger <code>trg_check_sobreposicao_escala</code>.
+            </p>
+            <label>Unidade
+                <select name="id_unidade" required></select>
+            </label>
+            <label>Residente
+                <select name="id_residente" required></select>
+            </label>
+            <label>Preceptor
+                <select name="id_preceptor" required></select>
+            </label>
+            <label>Dia da semana
+                <select name="dia_semana" class="select-dia" required></select>
+            </label>
+            <label>Turno
+                <select name="turno" class="select-turno" required></select>
+            </label>
+            <label>Mês de referência
+                <input type="number" name="mes_referencia" min="1" max="12" required />
+            </label>
+            <label>Ano de referência
+                <input type="number" name="ano_referencia" min="2000" required />
+            </label>
+            <button type="submit" class="btn primario">Cadastrar</button>
+        </form>
     </template>
 
     <template id="tpl-reajustar-escala">

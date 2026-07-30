@@ -340,6 +340,36 @@ tbody tr:hover {
     padding: 0.5rem 0;
 }
 
+/* Agrupa botões no lado direito de uma .toolbar. */
+.acoes-toolbar {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+/* Etiqueta da operação na trilha de auditoria. */
+.chip {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: #fff;
+}
+
+.chip.insert { background: var(--primaria); }
+.chip.update { background: #d97706; }
+.chip.delete { background: var(--perigo); }
+
+/* Uma linha por campo alterado, em fonte monoespaçada para alinhar os "→". */
+.col-mudancas {
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: var(--texto-suave);
+}
+
 .toasts {
     position: fixed;
     bottom: 1.25rem;

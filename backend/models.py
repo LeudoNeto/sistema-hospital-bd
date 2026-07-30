@@ -1,7 +1,18 @@
 from datetime import date, datetime
-from typing import Optional
+from decimal import Decimal
+from typing import Any, Optional
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -175,6 +186,7 @@ class Procedimento(Base):
     codigo: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
     nome: Mapped[str] = mapped_column(String(100), nullable=False)
     tempo_medio_minutos: Mapped[int] = mapped_column(nullable=False)
+    media_tempo_procedimento: Mapped[Optional[Decimal]] = mapped_column(Numeric(7, 2))
     nivel_risco: Mapped[str] = mapped_column(String(10), nullable=False)
 
     realizacoes: Mapped[list["ProcedimentoRealizado"]] = relationship(
@@ -239,3 +251,21 @@ class Escala(Base):
 
     def __repr__(self) -> str:
         return f"<Escala id={self.id_escala} unidade={self.id_unidade} turno={self.turno!r}>"
+
+
+class AuditoriaAtendimento(Base):
+    __tablename__ = "AUDITORIA_ATENDIMENTO"
+
+    id_auditoria: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    id_atendimento: Mapped[int] = mapped_column(Integer, nullable=False)
+    operacao: Mapped[str] = mapped_column(String(10), nullable=False)
+    usuario: Mapped[str] = mapped_column(String(100), nullable=False)
+    data_hora: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    dados_antigos: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON)
+    dados_novos: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON)
+
+    def __repr__(self) -> str:
+        return (
+            f"<AuditoriaAtendimento id={self.id_auditoria} "
+            f"atendimento={self.id_atendimento} operacao={self.operacao!r}>"
+        )

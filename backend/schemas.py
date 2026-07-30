@@ -1,7 +1,12 @@
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, model_validator
+
+# Domínios de ESCALA. Espelham os CHECK CK_DIA_SEMANA e CK_TURNO do schema —
+# acentuados e em minúsculo, exatamente como gravados no banco.
+DiaSemana = Literal["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"]
+Turno = Literal["manhã", "tarde", "noite"]
 
 
 class ProcedimentoRealizadoCreate(BaseModel):
@@ -21,6 +26,16 @@ class AtendimentoCreate(BaseModel):
     id_unidade: Optional[int] = None
     # Regra de negócio: todo atendimento precisa de ao menos um procedimento.
     procedimentos: list[ProcedimentoRealizadoCreate] = Field(min_length=1)
+
+
+class EscalaCreate(BaseModel):
+    id_unidade: int
+    dia_semana: DiaSemana
+    turno: Turno
+    mes_referencia: int = Field(ge=1, le=12)
+    ano_referencia: int = Field(ge=2000)
+    id_residente: int
+    id_preceptor: int
 
 
 class EscalaReajuste(BaseModel):

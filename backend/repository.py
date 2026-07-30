@@ -2,13 +2,14 @@ import json
 from contextlib import contextmanager
 
 from sqlalchemy import extract, func, select
-from sqlalchemy.exc import DBAPIError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import aliased, contains_eager, joinedload, selectinload
 
 from database import conexao_procedure, sessao, transacao
 from erros import EntidadeNaoEncontrada, OperacaoNaoPermitida
 from models import (
     Atendimento,
+    AuditoriaAtendimento,
     Base,
     Escala,
     Paciente,
@@ -29,17 +30,22 @@ CAMPOS_EDITAVEIS_PACIENTE = frozenset({"endereco", "num_convenio"})
 DIAS_SEMANA = ("segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo")
 TURNOS = ("manhã", "tarde", "noite")
 
-# MYSQL_ERRNO usados pelos SIGNAL em database/procedures.sql.
+# MYSQL_ERRNO usados pelos SIGNAL em database/procedures.sql e
+# database/triggers.sql.
 ERRO_NAO_ENCONTRADO = 4404  # entidade referenciada não existe
 ERRO_REGRA_NEGOCIO = 1644   # default do SIGNAL SQLSTATE '45000'
+ERRO_DUPLICADO = 1062       # ER_DUP_ENTRY: violação de UNIQUE
 
 
 @contextmanager
-def _erros_da_procedure():
-    """Traduz o ``SIGNAL`` das stored procedures nas exceções de negócio.
+def _erros_do_banco():
+    """Traduz o ``SIGNAL`` das stored procedures e dos triggers nas exceções
+    de negócio.
 
-    Assim as mensagens escritas dentro das procedures caem no mesmo mapeamento
-    para HTTP que o ``controller`` já aplica às regras validadas em Python.
+    Assim as mensagens escritas no banco caem no mesmo mapeamento para HTTP
+    que o ``controller`` já aplica às regras validadas em Python. Vale tanto
+    para as chamadas de procedure quanto para as escritas da ORM que podem
+    ser barradas por um trigger.
     """
     try:
         yield
@@ -73,6 +79,12 @@ class Repository:
 
     def procedimento_existe(self, id_procedimento: int) -> bool:
         return self._existe(Procedimento, id_procedimento)
+
+    def unidade_existe(self, id_unidade: int) -> bool:
+        return self._existe(Unidade, id_unidade)
+
+    def escala_existe(self, id_escala: int) -> bool:
+        return self._existe(Escala, id_escala)
 
 
     def inserir_atendimento_com_procedimentos(
@@ -141,7 +153,7 @@ class Repository:
             for p in procedimentos
         ]
 
-        with _erros_da_procedure(), conexao_procedure() as conn:
+        with _erros_do_banco(), conexao_procedure() as conn:
             conn.exec_driver_sql(
                 "CALL sp_registrar_atendimento_completo"
                 "(%s, %s, %s, %s, %s, %s, %s, @id_atendimento)",
@@ -160,7 +172,7 @@ class Repository:
     def tempo_medio_espera_por_unidade(
         self, mes: int | None = None, ano: int | None = None
     ) -> list:
-        with _erros_da_procedure(), conexao_procedure() as conn:
+        with _erros_do_banco(), conexao_procedure() as conn:
             linhas = conn.exec_driver_sql(
                 "CALL sp_calcular_tempo_medio_espera(%s, %s)", (mes, ano)
             ).mappings().all()
@@ -197,7 +209,7 @@ class Repository:
 
         Havendo qualquer conflito, a procedure não move nada e sinaliza erro.
         """
-        with _erros_da_procedure(), conexao_procedure() as conn:
+        with _erros_do_banco(), conexao_procedure() as conn:
             conn.exec_driver_sql(
                 "CALL sp_reajustar_escala(%s, %s, %s, %s, %s, %s, %s, @movidas)",
                 (
@@ -211,6 +223,36 @@ class Repository:
                 ),
             )
             return conn.exec_driver_sql("SELECT @movidas").scalar()
+
+    def inserir_escala(self, dados) -> int:
+        with _erros_do_banco(), transacao() as s:
+            escala = Escala(
+                id_unidade=dados.id_unidade,
+                dia_semana=dados.dia_semana,
+                turno=dados.turno,
+                mes_referencia=dados.mes_referencia,
+                ano_referencia=dados.ano_referencia,
+                id_residente=dados.id_residente,
+                id_preceptor=dados.id_preceptor,
+            )
+            s.add(escala)
+            try:
+                s.flush()
+            except IntegrityError as erro:
+                argumentos = getattr(erro.orig, "args", ())
+                if argumentos and argumentos[0] == ERRO_DUPLICADO:
+                    raise OperacaoNaoPermitida(
+                        "O residente já está escalado nesta unidade neste "
+                        "dia, turno e mês de referência."
+                    ) from erro
+                raise
+            return escala.id_escala
+
+    def remover_escala(self, id_escala: int) -> None:
+        with transacao() as s:
+            escala = s.get(Escala, id_escala)
+            if escala is not None:
+                s.delete(escala)
 
     def remover_procedimento_realizado(
         self, id_atendimento: int, id_procedimento: int
@@ -394,6 +436,91 @@ class Repository:
             return [
                 {"id_paciente": linha.id_paciente, "nome": linha.nome}
                 for linha in s.execute(consulta)
+            ]
+
+    def tempos_observados_procedimentos(self) -> list:
+        with sessao() as s:
+            realizacoes = func.count(ProcedimentoRealizado.id_atendimento).label(
+                "realizacoes"
+            )
+            consulta = (
+                select(
+                    Procedimento.codigo,
+                    Procedimento.nome,
+                    Procedimento.tempo_medio_minutos,
+                    Procedimento.media_tempo_procedimento,
+                    realizacoes,
+                )
+                .outerjoin(
+                    ProcedimentoRealizado,
+                    ProcedimentoRealizado.id_procedimento
+                    == Procedimento.id_procedimento,
+                )
+                .group_by(
+                    Procedimento.id_procedimento,
+                    Procedimento.codigo,
+                    Procedimento.nome,
+                    Procedimento.tempo_medio_minutos,
+                    Procedimento.media_tempo_procedimento,
+                )
+                .order_by(Procedimento.codigo)
+            )
+
+            linhas = []
+            for linha in s.execute(consulta):
+                observado = (
+                    float(linha.media_tempo_procedimento)
+                    if linha.media_tempo_procedimento is not None
+                    else None
+                )
+                previsto = linha.tempo_medio_minutos
+                desvio = round(observado - previsto, 2) if observado is not None else None
+                linhas.append(
+                    {
+                        "codigo": linha.codigo,
+                        "nome": linha.nome,
+                        "tempo_estimado_minutos": previsto,
+                        "media_observada_minutos": observado,
+                        "realizacoes": linha.realizacoes,
+                        "desvio_minutos": desvio,
+                        "desvio_percentual": (
+                            round(desvio / previsto * 100, 1)
+                            if desvio is not None and previsto
+                            else None
+                        ),
+                    }
+                )
+            return linhas
+
+    def listar_auditoria(
+        self,
+        id_atendimento: int | None = None,
+        operacao: str | None = None,
+        limite: int = 200,
+    ) -> list:
+        with sessao() as s:
+            consulta = select(AuditoriaAtendimento)
+            if id_atendimento is not None:
+                consulta = consulta.where(
+                    AuditoriaAtendimento.id_atendimento == id_atendimento
+                )
+            if operacao is not None:
+                consulta = consulta.where(AuditoriaAtendimento.operacao == operacao)
+            consulta = consulta.order_by(
+                AuditoriaAtendimento.id_auditoria.desc()
+            ).limit(limite)
+
+            return [
+                {
+                    "id_auditoria": registro.id_auditoria,
+                    "id_atendimento": registro.id_atendimento,
+                    "operacao": registro.operacao,
+                    "usuario": registro.usuario,
+                    "data_hora": registro.data_hora,
+                    "dados_antigos": registro.dados_antigos,
+                    "dados_novos": registro.dados_novos,
+                }
+                for registro in s.scalars(consulta)
             ]
 
     # ==================================================================

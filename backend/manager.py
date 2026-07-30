@@ -116,10 +116,40 @@ class Manager:
     def pacientes_sem_procedimento_alto(self) -> list:
         return self.repository.pacientes_sem_procedimento_alto()
 
+    def tempos_observados_procedimentos(self) -> list:
+        return self.repository.tempos_observados_procedimentos()
+
+    def listar_auditoria(
+        self,
+        id_atendimento: int | None = None,
+        operacao: str | None = None,
+        limite: int = 200,
+    ) -> list:
+        return self.repository.listar_auditoria(id_atendimento, operacao, limite)
+
     def tempo_medio_espera_por_unidade(
         self, mes: int | None = None, ano: int | None = None
     ) -> list:
         return self.repository.tempo_medio_espera_por_unidade(mes, ano)
+
+    def criar_escala(self, dados) -> int:
+        if not self.repository.unidade_existe(dados.id_unidade):
+            raise EntidadeNaoEncontrada(f"Unidade {dados.id_unidade} não encontrada.")
+        if not self.repository.residente_existe(dados.id_residente):
+            raise EntidadeNaoEncontrada(
+                f"Residente {dados.id_residente} não encontrado."
+            )
+        if not self.repository.preceptor_existe(dados.id_preceptor):
+            raise EntidadeNaoEncontrada(
+                f"Preceptor {dados.id_preceptor} não encontrado."
+            )
+
+        return self.repository.inserir_escala(dados)
+
+    def remover_escala(self, id_escala: int) -> None:
+        if not self.repository.escala_existe(id_escala):
+            raise EntidadeNaoEncontrada(f"Escala {id_escala} não encontrada.")
+        self.repository.remover_escala(id_escala)
 
     def reajustar_escala(self, dados) -> int:
         return self.repository.reajustar_escala(

@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException
 
 from erros import EntidadeNaoEncontrada, OperacaoNaoPermitida
 from manager import Manager
-from schemas import AtendimentoCreate, EscalaReajuste, PacienteUpdate
+from schemas import AtendimentoCreate, EscalaCreate, EscalaReajuste, PacienteUpdate
 
 
 class Controller:
@@ -100,9 +100,32 @@ class Controller:
         ):
             return manager.tempo_medio_espera_por_unidade(mes, ano)
 
+        @self.router.get(
+            "/relatorios/tempos-observados-procedimentos", tags=["Relatórios"]
+        )
+        def tempos_observados_procedimentos():
+            return manager.tempos_observados_procedimentos()
+
         @self.router.get("/escalas", tags=["Escalas"])
         def listar_escalas():
             return manager.listar_escalas()
+
+        @self.router.post("/escalas", status_code=201, tags=["Escalas"])
+        def criar_escala(escala: EscalaCreate):
+            try:
+                novo_id = manager.criar_escala(escala)
+            except EntidadeNaoEncontrada as erro:
+                raise HTTPException(status_code=404, detail=str(erro))
+            except OperacaoNaoPermitida as erro:
+                raise HTTPException(status_code=409, detail=str(erro))
+            return {"id_escala": novo_id}
+
+        @self.router.delete("/escalas/{id_escala}", status_code=204, tags=["Escalas"])
+        def remover_escala(id_escala: int):
+            try:
+                manager.remover_escala(id_escala)
+            except EntidadeNaoEncontrada as erro:
+                raise HTTPException(status_code=404, detail=str(erro))
 
         @self.router.post("/escalas/reajustar", tags=["Escalas"])
         def reajustar_escala(dados: EscalaReajuste):
@@ -113,6 +136,14 @@ class Controller:
             except OperacaoNaoPermitida as erro:
                 raise HTTPException(status_code=409, detail=str(erro))
             return {"escalas_movidas": movidas}
+
+        @self.router.get("/auditoria", tags=["Auditoria"])
+        def listar_auditoria(
+            id_atendimento: Optional[int] = None,
+            operacao: Optional[str] = None,
+            limite: int = 200,
+        ):
+            return manager.listar_auditoria(id_atendimento, operacao, limite)
 
         # ==============================================================
         # Extras para o front-end

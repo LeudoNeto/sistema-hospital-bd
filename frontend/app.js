@@ -74,6 +74,22 @@ const ROTULOS = {
     tempo_medio_espera_minutos: "Espera média (min)",
     menor_espera_minutos: "Menor espera (min)",
     maior_espera_minutos: "Maior espera (min)",
+    tempo_estimado_minutos: "Estimado (min)",
+    media_observada_minutos: "Observado (min)",
+    desvio_minutos: "Desvio (min)",
+    desvio_percentual: "Desvio (%)",
+    realizacoes: "Realizações",
+};
+
+// Campos de ATENDIMENTO guardados no JSON da auditoria. id_atendimento fica
+// de fora: já é coluna própria da tabela da trilha.
+const CAMPOS_AUDITORIA = {
+    data_hora: "data/hora",
+    duracao_minutos: "duração",
+    id_paciente: "paciente",
+    id_residente: "residente",
+    id_preceptor: "preceptor",
+    id_unidade: "unidade",
 };
 
 // Domínios de ESCALA, na ordem cronológica (espelham os CHECK do schema).
@@ -96,8 +112,9 @@ function rotulo(chave) {
 function formatarValor(valor) {
     if (valor === null || valor === undefined) return "—";
     if (typeof valor === "boolean") return valor ? "Sim" : "Não";
-    if (typeof valor === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(valor)) {
-        const [data, hora] = valor.split("T");
+    // ISO da API ("...T10:00") e o formato do JSON da auditoria ("... 10:00").
+    if (typeof valor === "string" && /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(valor)) {
+        const [data, hora] = valor.split(/[T ]/);
         const [a, m, d] = data.split("-");
         return `${d}/${m}/${a} ${hora.slice(0, 5)}`;
     }
@@ -486,6 +503,105 @@ async function excluirProcedimento(idAtendimento, idProcedimento) {
 }
 
 // ======================================================================
+// Auditoria (trilha gravada pelos triggers trg_audita_atendimento_*)
+// ======================================================================
+
+document
+    .getElementById("btn-historico-auditoria")
+    .addEventListener("click", abrirModalAuditoria);
+
+function abrirModalAuditoria() {
+    abrirModal("Histórico de alterações em atendimentos", '<p class="empty">Carregando…</p>');
+    renderAuditoria();
+}
+
+async function renderAuditoria() {
+    const corpo = document.getElementById("modal-corpo");
+    try {
+        const linhas = await api("GET", "/auditoria");
+        if (linhas.length === 0) {
+            corpo.innerHTML =
+                '<p class="empty">Nenhuma alteração registrada ainda. ' +
+                "A trilha começa a ser preenchida no primeiro atendimento gravado.</p>";
+            return;
+        }
+        corpo.innerHTML = "";
+        corpo.appendChild(tabelaAuditoria(linhas));
+    } catch (erro) {
+        corpo.innerHTML = `<p class="empty">${erro.message}</p>`;
+    }
+}
+
+/**
+ * Descreve o que mudou em cada registro da trilha:
+ * UPDATE compara antes/depois e lista só os campos alterados; INSERT e DELETE
+ * mostram o estado gravado/removido.
+ */
+function resumirAuditoria(registro) {
+    const antes = registro.dados_antigos || {};
+    const depois = registro.dados_novos || {};
+    const campos = Object.keys(CAMPOS_AUDITORIA);
+
+    if (registro.operacao === "UPDATE") {
+        const alterados = campos.filter((c) => String(antes[c]) !== String(depois[c]));
+        if (alterados.length === 0) return ["(nenhum campo auditado mudou)"];
+        return alterados.map(
+            (c) =>
+                `${CAMPOS_AUDITORIA[c]}: ${formatarValor(antes[c])} → ` +
+                `${formatarValor(depois[c])}`
+        );
+    }
+
+    const estado = registro.operacao === "DELETE" ? antes : depois;
+    return campos.map((c) => `${CAMPOS_AUDITORIA[c]}: ${formatarValor(estado[c])}`);
+}
+
+function tabelaAuditoria(linhas) {
+    const tabela = document.createElement("table");
+    tabela.innerHTML =
+        "<thead><tr><th>Quando</th><th>Atendimento</th><th>Operação</th>" +
+        "<th>Usuário</th><th>Alterações</th></tr></thead>";
+
+    const tbody = document.createElement("tbody");
+    linhas.forEach((registro) => {
+        const tr = document.createElement("tr");
+
+        [
+            formatarValor(registro.data_hora),
+            `#${registro.id_atendimento}`,
+        ].forEach((texto) => {
+            const td = document.createElement("td");
+            td.textContent = texto;
+            tr.appendChild(td);
+        });
+
+        const tdOperacao = document.createElement("td");
+        const chip = document.createElement("span");
+        chip.className = `chip ${registro.operacao.toLowerCase()}`;
+        chip.textContent = registro.operacao;
+        tdOperacao.appendChild(chip);
+        tr.appendChild(tdOperacao);
+
+        const tdUsuario = document.createElement("td");
+        tdUsuario.textContent = registro.usuario;
+        tr.appendChild(tdUsuario);
+
+        const tdMudancas = document.createElement("td");
+        tdMudancas.className = "col-mudancas";
+        resumirAuditoria(registro).forEach((texto) => {
+            const div = document.createElement("div");
+            div.textContent = texto;
+            tdMudancas.appendChild(div);
+        });
+        tr.appendChild(tdMudancas);
+
+        tbody.appendChild(tr);
+    });
+    tabela.appendChild(tbody);
+    return tabela;
+}
+
+// ======================================================================
 // Procedimentos (listagem simples)
 // ======================================================================
 
@@ -567,10 +683,78 @@ async function carregarEscalas() {
     const container = document.getElementById("tabela-escalas");
     try {
         const linhas = await api("GET", "/escalas");
-        renderTabela(container, linhas);
+        renderTabela(container, linhas, (linha) => [
+            {
+                rotulo: "Excluir",
+                classe: "perigo",
+                aoClicar: () => excluirEscala(linha.id_escala),
+            },
+        ]);
     } catch (erro) {
         toast(erro.message, "erro");
     }
+}
+
+async function excluirEscala(idEscala) {
+    try {
+        await api("DELETE", `/escalas/${idEscala}`);
+        toast(`Escala #${idEscala} removida com sucesso.`);
+        carregarEscalas();
+    } catch (erro) {
+        toast(erro.message, "erro");
+    }
+}
+
+// --- Modal: Nova escala ---
+document
+    .getElementById("btn-nova-escala")
+    .addEventListener("click", abrirModalNovaEscala);
+
+async function abrirModalNovaEscala() {
+    let opcoes;
+    try {
+        opcoes = await carregarOpcoes();
+    } catch (erro) {
+        toast(erro.message, "erro");
+        return;
+    }
+
+    const form = clonarTemplate("tpl-nova-escala");
+    preencherSelect(form.id_unidade, opcoes.unidades, (u) => u.id_unidade, (u) => u.nome, "Selecione…");
+    preencherSelect(form.id_residente, opcoes.residentes, (p) => p.id_pessoa, (p) => p.nome, "Selecione…");
+    preencherSelect(form.id_preceptor, opcoes.preceptores, (p) => p.id_pessoa, (p) => p.nome, "Selecione…");
+    preencherSelectSimples(form.dia_semana, DIAS_SEMANA);
+    preencherSelectSimples(form.turno, TURNOS);
+
+    // Mês/ano correntes como padrão — é o recorte que o painel mais usa.
+    const agora = new Date();
+    form.mes_referencia.value = agora.getMonth() + 1;
+    form.ano_referencia.value = agora.getFullYear();
+
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const corpo = {
+            id_unidade: Number(form.id_unidade.value),
+            dia_semana: form.dia_semana.value,
+            turno: form.turno.value,
+            mes_referencia: Number(form.mes_referencia.value),
+            ano_referencia: Number(form.ano_referencia.value),
+            id_residente: Number(form.id_residente.value),
+            id_preceptor: Number(form.id_preceptor.value),
+        };
+        try {
+            const r = await api("POST", "/escalas", corpo);
+            toast(`Escala #${r.id_escala} cadastrada com sucesso.`);
+            fecharModal();
+            carregarEscalas();
+        } catch (erro) {
+            // Sobreposição entre unidades (trigger) e repetição exata
+            // (UNIQUE) chegam aqui como 409, com a mensagem do banco.
+            toast(erro.message, "erro");
+        }
+    });
+
+    abrirModal("Nova escala de plantão", form);
 }
 
 document
@@ -629,6 +813,7 @@ const RELATORIOS = {
     "ranking-residentes": "rel-ranking",
     "plantoes-por-unidade": "rel-plantoes",
     "pacientes-sem-procedimento-alto": "rel-pacientes-alto",
+    "tempos-observados-procedimentos": "rel-tempos-observados",
 };
 
 document.querySelectorAll("[data-relatorio]").forEach((botao) => {
