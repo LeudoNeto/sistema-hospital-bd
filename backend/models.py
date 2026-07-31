@@ -57,6 +57,7 @@ class Paciente(Base):
 
     pessoa: Mapped["Pessoa"] = relationship(back_populates="paciente")
     atendimentos: Mapped[list["Atendimento"]] = relationship(back_populates="paciente")
+    internacoes: Mapped[list["Internacao"]] = relationship(back_populates="paciente")
 
     def __repr__(self) -> str:
         return f"<Paciente id={self.id_pessoa}>"
@@ -145,9 +146,38 @@ class Unidade(Base):
 
     escalas: Mapped[list["Escala"]] = relationship(back_populates="unidade")
     atendimentos: Mapped[list["Atendimento"]] = relationship(back_populates="unidade")
+    internacoes: Mapped[list["Internacao"]] = relationship(back_populates="unidade")
 
     def __repr__(self) -> str:
         return f"<Unidade id={self.id_unidade} nome={self.nome!r}>"
+
+
+class Internacao(Base):
+    """Passagem do paciente pelo hospital. ``data_hora_saida`` em NULL marca a
+    internação em aberto — base da ``vw_pacientes_internados``."""
+
+    __tablename__ = "INTERNACAO"
+
+    id_internacao: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    id_paciente: Mapped[int] = mapped_column(
+        ForeignKey("PACIENTE.id_pessoa", ondelete="CASCADE"), nullable=False
+    )
+    id_unidade: Mapped[int] = mapped_column(
+        ForeignKey("UNIDADE.id_unidade"), nullable=False
+    )
+    data_hora_entrada: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    data_hora_saida: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    leito: Mapped[Optional[str]] = mapped_column(String(10))
+    motivo: Mapped[Optional[str]] = mapped_column(String(255))
+
+    paciente: Mapped["Paciente"] = relationship(back_populates="internacoes")
+    unidade: Mapped["Unidade"] = relationship(back_populates="internacoes")
+
+    def __repr__(self) -> str:
+        return (
+            f"<Internacao id={self.id_internacao} paciente={self.id_paciente} "
+            f"entrada={self.data_hora_entrada}>"
+        )
 
 
 class Atendimento(Base):

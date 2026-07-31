@@ -139,7 +139,7 @@ INSERT INTO HISTORICO_PROFISSIONAL (id_historico, id_profissional, papel, data_i
 (6, 11, 'residente', '2012-03-01', '2015-01-09'),
 (7, 11, 'preceptor', '2015-01-10', NULL),
 (8, 12, 'residente', '2009-03-01', '2012-05-19'),
-(9, 12, 'preceptor', '2012-05-20', NULL),
+(9, 12, 'preceptor', '2012-05-20', '2026-06-30'),
 (10, 13, 'preceptor', '2010-11-05', NULL),
 (11, 14, 'preceptor', '2018-02-15', NULL),
 (12, 15, 'preceptor', '2005-08-30', NULL);
@@ -162,3 +162,12 @@ INSERT INTO ESCALA (id_escala, id_unidade, dia_semana, mes_referencia, ano_refer
 -- Mês anterior (junho/2026)
 (10, 1, 'segunda', 6, 2026, 'manhã', 6, 11),
 (11, 2, 'terça', 6, 2026, 'noite', 9, 14);
+
+-- 12. Internações
+INSERT INTO INTERNACAO (id_internacao, id_paciente, id_unidade, data_hora_entrada, data_hora_saida, leito, motivo) VALUES
+(1, 1, 1, '2026-06-10 08:00:00', '2026-06-15 10:00:00', 'A-12', 'Observação pós-trauma'),
+(2, 2, 2, '2026-05-02 22:15:00', NULL,                  'U-02', 'Registro antigo: alta não lançada no sistema'),
+(3, 2, 1, '2026-07-01 09:00:00', '2026-07-05 11:30:00', 'A-03', 'Crise hipertensiva'),
+(4, 1, 2, '2026-07-28 14:00:00', NULL,                  'U-05', 'Pós-operatório de cirurgia de emergência'),
+(5, 5, 3, '2026-07-30 07:45:00', NULL,                  'P-04', 'Pneumonia'),
+(6, 4, 1, '2026-07-20 16:00:00', '2026-07-24 09:00:00', 'A-07', 'Fratura de fêmur');

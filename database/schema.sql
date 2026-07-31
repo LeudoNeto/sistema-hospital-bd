@@ -151,7 +151,26 @@ CREATE TABLE ESCALA (
     CONSTRAINT CK_ANO_REFERENCIA CHECK (ano_referencia >= 2000)
 );
 
--- 12. TABELA: AUDITORIA_ATENDIMENTO
+-- 12. TABELA: INTERNACAO
+CREATE TABLE INTERNACAO (
+    id_internacao INT AUTO_INCREMENT,
+    id_paciente INT NOT NULL,
+    id_unidade INT NOT NULL,
+    data_hora_entrada DATETIME NOT NULL,
+    data_hora_saida DATETIME,          -- NULL = internação em aberto
+    leito VARCHAR(10),
+    motivo VARCHAR(255),
+    CONSTRAINT PK_INTERNACAO PRIMARY KEY (id_internacao),
+    CONSTRAINT FK_INTERNACAO_PACIENTE FOREIGN KEY (id_paciente)
+        REFERENCES PACIENTE(id_pessoa) ON DELETE CASCADE,
+    CONSTRAINT FK_INTERNACAO_UNIDADE FOREIGN KEY (id_unidade)
+        REFERENCES UNIDADE(id_unidade),
+    CONSTRAINT CK_INTERNACAO_PERIODO
+        CHECK (data_hora_saida IS NULL OR data_hora_saida >= data_hora_entrada),
+    INDEX IX_INTERNACAO_PACIENTE (id_paciente, data_hora_entrada)
+);
+
+-- 13. TABELA: AUDITORIA_ATENDIMENTO
 CREATE TABLE AUDITORIA_ATENDIMENTO (
     id_auditoria INT AUTO_INCREMENT,
     id_atendimento INT NOT NULL,

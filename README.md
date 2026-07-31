@@ -46,8 +46,8 @@ Sobem três serviços: `db` (MySQL, porta 3306), `backend` (API, porta 8000) e `
 ## 3. Carregar os scripts do banco
 
 O MySQL sobe com o banco **vazio**. Carregue nesta ordem: o **schema** (criação das
-tabelas), os **dados de teste**, as **stored procedures** e os **triggers**. Use a mesma
-senha definida em `MYSQL_PASSWORD`.
+tabelas), os **dados de teste**, as **stored procedures**, os **triggers** e as **views**.
+Use a mesma senha definida em `MYSQL_PASSWORD`.
 
 > 🔴 **`--default-character-set=utf8mb4` não é opcional.** O cliente `mysql` da imagem
 > assume `latin1`, e os três scripts contêm acentos — sem a flag os bytes UTF-8 são
@@ -63,6 +63,7 @@ $CARGA < database/schema.sql
 $CARGA < database/mock_data.sql
 $CARGA < database/procedures.sql
 $CARGA < database/triggers.sql
+$CARGA < database/views.sql
 ```
 
 **Windows PowerShell** (não suporta o operador `<`):
@@ -73,13 +74,14 @@ Get-Content database/schema.sql     -Encoding UTF8 | & $carga
 Get-Content database/mock_data.sql  -Encoding UTF8 | & $carga
 Get-Content database/procedures.sql -Encoding UTF8 | & $carga
 Get-Content database/triggers.sql   -Encoding UTF8 | & $carga
+Get-Content database/views.sql      -Encoding UTF8 | & $carga
 ```
 
 > ⚠️ Carregue sempre por `stdin`, como acima. Passar texto acentuado em `mysql -e "..."`
 > não funciona no Windows: o argumento é reconvertido para a codepage ANSI antes de chegar
 > ao contêiner e os acentos são corrompidos no caminho.
 
-`procedures.sql` e `triggers.sql` são idempotentes (cada objeto tem seu
+`procedures.sql`, `triggers.sql` e `views.sql` são idempotentes (cada objeto tem seu
 `DROP ... IF EXISTS`), então podem ser recarregados sozinhos sempre que forem alterados.
 
 > 📌 `triggers.sql` precisa vir **depois** de `schema.sql`, de onde vêm a tabela
@@ -143,4 +145,40 @@ CREATE TABLE AUDITORIA_ATENDIMENTO (
     CONSTRAINT CK_AUDITORIA_OPERACAO CHECK (operacao IN ('INSERT', 'UPDATE', 'DELETE')),
     INDEX IX_AUDITORIA_ATENDIMENTO (id_atendimento)
 );
+```
+
+### Aplicar os objetos das views num banco já carregado
+
+Mesma situação: `views.sql` depende da tabela `INTERNACAO`, que entrou no `schema.sql`
+junto com as views. Num banco já populado, crie a tabela e carregue as internações de
+teste antes de rodar `views.sql`:
+
+```sql
+CREATE TABLE INTERNACAO (
+    id_internacao INT AUTO_INCREMENT,
+    id_paciente INT NOT NULL,
+    id_unidade INT NOT NULL,
+    data_hora_entrada DATETIME NOT NULL,
+    data_hora_saida DATETIME,
+    leito VARCHAR(10),
+    motivo VARCHAR(255),
+    CONSTRAINT PK_INTERNACAO PRIMARY KEY (id_internacao),
+    CONSTRAINT FK_INTERNACAO_PACIENTE FOREIGN KEY (id_paciente)
+        REFERENCES PACIENTE(id_pessoa) ON DELETE CASCADE,
+    CONSTRAINT FK_INTERNACAO_UNIDADE FOREIGN KEY (id_unidade)
+        REFERENCES UNIDADE(id_unidade),
+    CONSTRAINT CK_INTERNACAO_PERIODO
+        CHECK (data_hora_saida IS NULL OR data_hora_saida >= data_hora_entrada),
+    INDEX IX_INTERNACAO_PACIENTE (id_paciente, data_hora_entrada)
+);
+```
+
+Depois copie o bloco `INSERT INTO INTERNACAO (...)` do fim de `mock_data.sql` e aplique
+também este `UPDATE`, que encerra a supervisão do preceptor 12 — é ele que dá à
+`vw_residentes_sem_supervisor` um caso do motivo "sem supervisão ativa":
+
+```sql
+UPDATE HISTORICO_PROFISSIONAL
+   SET data_fim = '2026-06-30'
+ WHERE id_profissional = 12 AND papel = 'preceptor' AND data_fim IS NULL;
 ```
