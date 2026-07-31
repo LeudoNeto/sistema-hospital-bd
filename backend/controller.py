@@ -131,6 +131,20 @@ class Controller:
             return manager.tempos_observados_procedimentos()
 
         @self.router.get(
+            "/relatorios/preceptores-de-flamenguistas", tags=["Relatórios"]
+        )
+        def preceptores_de_pacientes_flamenguistas():
+            return manager.preceptores_de_pacientes_flamenguistas()
+
+        @self.router.get("/relatorios/ultimo-atendimento", tags=["Relatórios"])
+        def ultimo_atendimento_por_paciente():
+            return manager.ultimo_atendimento_por_paciente()
+
+        @self.router.get("/relatorios/percentual-alto-risco", tags=["Relatórios"])
+        def percentual_alto_risco_por_residente():
+            return manager.percentual_alto_risco_por_residente()
+
+        @self.router.get(
             "/relatorios/residentes-sem-supervisor", tags=["Relatórios"]
         )
         def residentes_sem_supervisor():

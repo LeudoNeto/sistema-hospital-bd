@@ -1,7 +1,7 @@
 import json
 from contextlib import contextmanager
 
-from sqlalchemy import extract, func, select, text, update
+from sqlalchemy import case, extract, func, select, text, update
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import aliased, contains_eager, joinedload, selectinload
 
@@ -590,6 +590,202 @@ class Repository:
                 )
             return linhas
 
+
+    def preceptores_de_pacientes_flamenguistas(self) -> list:
+        with sessao() as s:
+            pessoa_preceptor = aliased(Pessoa)
+            pessoa_paciente = aliased(Pessoa)
+
+            residentes = func.count(func.distinct(Atendimento.id_residente)).label(
+                "residentes_supervisionados"
+            )
+            pacientes = func.count(func.distinct(Atendimento.id_paciente)).label(
+                "pacientes_flamenguistas"
+            )
+            atendimentos = func.count(Atendimento.id_atendimento).label("atendimentos")
+
+            consulta = (
+                select(
+                    pessoa_preceptor.nome.label("preceptor"),
+                    Preceptor.titulacao,
+                    residentes,
+                    pacientes,
+                    atendimentos,
+                )
+                .select_from(Atendimento)
+                .join(
+                    pessoa_preceptor,
+                    pessoa_preceptor.id_pessoa == Atendimento.id_preceptor,
+                )
+                .join(Preceptor, Preceptor.id_profissional == Atendimento.id_preceptor)
+                .join(
+                    pessoa_paciente,
+                    pessoa_paciente.id_pessoa == Atendimento.id_paciente,
+                )
+                .where(pessoa_paciente.is_flamengo.is_(True))
+                .group_by(
+                    Atendimento.id_preceptor,
+                    pessoa_preceptor.nome,
+                    Preceptor.titulacao,
+                )
+                .order_by(atendimentos.desc(), pessoa_preceptor.nome)
+            )
+            return [
+                {
+                    "preceptor": linha.preceptor,
+                    "titulacao": linha.titulacao,
+                    "residentes_supervisionados": linha.residentes_supervisionados,
+                    "pacientes_flamenguistas": linha.pacientes_flamenguistas,
+                    "atendimentos": linha.atendimentos,
+                }
+                for linha in s.execute(consulta)
+            ]
+
+    def ultimo_atendimento_por_paciente(self) -> list:
+        with sessao() as s:
+            posicao = func.row_number().over(
+                partition_by=Atendimento.id_paciente,
+                order_by=(
+                    Atendimento.data_hora.desc(),
+                    Atendimento.id_atendimento.desc(),
+                ),
+            )
+            ranqueados = select(
+                Atendimento.id_atendimento, posicao.label("posicao")
+            ).subquery()
+            ultimos = select(ranqueados.c.id_atendimento).where(
+                ranqueados.c.posicao == 1
+            )
+
+            consulta = (
+                select(Atendimento)
+                .where(Atendimento.id_atendimento.in_(ultimos))
+                .options(
+                    joinedload(Atendimento.residente)
+                    .joinedload(Residente.profissional)
+                    .joinedload(Profissional.pessoa),
+                    joinedload(Atendimento.preceptor)
+                    .joinedload(Preceptor.profissional)
+                    .joinedload(Profissional.pessoa),
+                    joinedload(Atendimento.unidade),
+                    selectinload(Atendimento.procedimentos_realizados).joinedload(
+                        ProcedimentoRealizado.procedimento
+                    ),
+                )
+            )
+            por_paciente = {a.id_paciente: a for a in s.scalars(consulta).unique()}
+
+            pacientes = s.scalars(
+                select(Paciente)
+                .options(joinedload(Paciente.pessoa))
+                .join(Pessoa, Pessoa.id_pessoa == Paciente.id_pessoa)
+                .order_by(Pessoa.nome)
+            ).unique()
+
+            linhas = []
+            for pac in pacientes:
+                atendimento = por_paciente.get(pac.id_pessoa)
+                if atendimento is None:
+                    linhas.append(
+                        {
+                            "paciente": pac.pessoa.nome,
+                            "data_hora": None,
+                            "residente": None,
+                            "preceptor": None,
+                            "unidade": None,
+                            "procedimentos": None,
+                        }
+                    )
+                    continue
+
+                realizados = sorted(
+                    atendimento.procedimentos_realizados,
+                    key=lambda pr: pr.procedimento.nome,
+                )
+                linhas.append(
+                    {
+                        "paciente": pac.pessoa.nome,
+                        "data_hora": atendimento.data_hora,
+                        "residente": atendimento.residente.profissional.pessoa.nome,
+                        "preceptor": atendimento.preceptor.profissional.pessoa.nome,
+                        "unidade": (
+                            atendimento.unidade.nome if atendimento.unidade else None
+                        ),
+                        "procedimentos": " · ".join(
+                            f"{pr.procedimento.nome} ({pr.quantidade}x)"
+                            for pr in realizados
+                        )
+                        or None,
+                    }
+                )
+            return linhas
+
+    def percentual_alto_risco_por_residente(self) -> list:
+        with sessao() as s:
+            quantidade_alto_risco = func.sum(
+                case(
+                    (
+                        Procedimento.nivel_risco == "alto",
+                        ProcedimentoRealizado.quantidade,
+                    ),
+                    else_=0,
+                )
+            )
+            realizados = func.coalesce(
+                func.sum(ProcedimentoRealizado.quantidade), 0
+            ).label("procedimentos_realizados")
+            alto_risco = func.coalesce(quantidade_alto_risco, 0).label("de_alto_risco")
+            # NULLIF evita divisão por zero para quem não realizou nada; o
+            # COALESCE externo transforma o NULL resultante em 0%.
+            percentual = func.coalesce(
+                func.round(
+                    100.0
+                    * quantidade_alto_risco
+                    / func.nullif(func.sum(ProcedimentoRealizado.quantidade), 0),
+                    2,
+                ),
+                0,
+            ).label("percentual_alto_risco")
+
+            consulta = (
+                select(
+                    Pessoa.nome.label("residente"),
+                    Residente.ano_residencia,
+                    realizados,
+                    alto_risco,
+                    percentual,
+                )
+                .select_from(Residente)
+                .join(Pessoa, Pessoa.id_pessoa == Residente.id_profissional)
+                .outerjoin(
+                    Atendimento,
+                    Atendimento.id_residente == Residente.id_profissional,
+                )
+                .outerjoin(
+                    ProcedimentoRealizado,
+                    ProcedimentoRealizado.id_atendimento == Atendimento.id_atendimento,
+                )
+                .outerjoin(
+                    Procedimento,
+                    Procedimento.id_procedimento
+                    == ProcedimentoRealizado.id_procedimento,
+                )
+                .group_by(
+                    Residente.id_profissional, Pessoa.nome, Residente.ano_residencia
+                )
+                .order_by(percentual.desc(), Pessoa.nome)
+            )
+            return [
+                {
+                    "residente": linha.residente,
+                    "ano_residencia": linha.ano_residencia,
+                    "procedimentos_realizados": int(linha.procedimentos_realizados),
+                    "de_alto_risco": int(linha.de_alto_risco),
+                    # ROUND devolve Decimal; o front espera número.
+                    "percentual_alto_risco": float(linha.percentual_alto_risco),
+                }
+                for linha in s.execute(consulta)
+            ]
 
     # Leituras das views
     def listar_pacientes_internados(self) -> list:

@@ -153,6 +153,15 @@ class Manager:
     def pacientes_sem_procedimento_alto(self) -> list:
         return self.repository.pacientes_sem_procedimento_alto()
 
+    def preceptores_de_pacientes_flamenguistas(self) -> list:
+        return self.repository.preceptores_de_pacientes_flamenguistas()
+
+    def ultimo_atendimento_por_paciente(self) -> list:
+        return self.repository.ultimo_atendimento_por_paciente()
+
+    def percentual_alto_risco_por_residente(self) -> list:
+        return self.repository.percentual_alto_risco_por_residente()
+
     def tempos_observados_procedimentos(self) -> list:
         return self.repository.tempos_observados_procedimentos()
 

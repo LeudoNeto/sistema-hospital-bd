@@ -93,6 +93,13 @@ const ROTULOS = {
     duracao_maxima_minutos: "Duração máx. (min)",
     total_procedimentos: "Procedimentos",
     procedimentos_mais_comuns: "Mais comuns",
+    titulacao: "Titulação",
+    residentes_supervisionados: "Residentes",
+    pacientes_flamenguistas: "Pacientes flamenguistas",
+    atendimentos: "Atendimentos",
+    procedimentos_realizados: "Realizados",
+    de_alto_risco: "De alto risco",
+    percentual_alto_risco: "Alto risco (%)",
 };
 
 // Campos de ATENDIMENTO guardados no JSON da auditoria. id_atendimento fica
@@ -1043,6 +1050,9 @@ const RELATORIOS = {
     "pacientes-sem-procedimento-alto": "rel-pacientes-alto",
     "tempos-observados-procedimentos": "rel-tempos-observados",
     "residentes-sem-supervisor": "rel-sem-supervisor",
+    "preceptores-de-flamenguistas": "rel-preceptores-flamengo",
+    "ultimo-atendimento": "rel-ultimo-atendimento",
+    "percentual-alto-risco": "rel-alto-risco",
 };
 
 document.querySelectorAll("[data-relatorio]").forEach((botao) => {
