@@ -79,6 +79,20 @@ const ROTULOS = {
     desvio_minutos: "Desvio (min)",
     desvio_percentual: "Desvio (%)",
     realizacoes: "Realizações",
+    id_internacao: "ID",
+    mes: "Mês",
+    situacao: "Situação",
+    data_hora_entrada: "Entrada",
+    data_hora_saida: "Saída",
+    dias_internado: "Dias internado",
+    tipo_unidade: "Tipo",
+    titulacao_preceptor: "Titulação",
+    supervisao_ativa: "Supervisão ativa",
+    duracao_media_minutos: "Duração média (min)",
+    duracao_minima_minutos: "Duração mín. (min)",
+    duracao_maxima_minutos: "Duração máx. (min)",
+    total_procedimentos: "Procedimentos",
+    procedimentos_mais_comuns: "Mais comuns",
 };
 
 // Campos de ATENDIMENTO guardados no JSON da auditoria. id_atendimento fica
@@ -760,6 +774,139 @@ function abrirModalEditarPaciente(paciente) {
 // Escalas (listagem + reajuste de dia/turno via sp_reajustar_escala)
 // ======================================================================
 
+// ======================================================================
+// Internações (card da view vw_pacientes_internados + CRUD da tabela)
+// ======================================================================
+
+// A aba tem duas tabelas que precisam andar juntas: registrar uma alta muda a
+// listagem E o card de internados.
+async function carregarInternacoes() {
+    await Promise.all([carregarPacientesInternados(), carregarTodasInternacoes()]);
+}
+
+async function carregarPacientesInternados() {
+    const container = document.getElementById("tabela-internados");
+    const contador = document.getElementById("contador-internados");
+    try {
+        const linhas = await api("GET", "/internacoes/internados");
+        contador.textContent =
+            linhas.length === 1 ? "1 paciente" : `${linhas.length} pacientes`;
+        renderTabela(container, linhas, null, ["id_internacao", "id_paciente"]);
+    } catch (erro) {
+        contador.textContent = "";
+        toast(erro.message, "erro");
+    }
+}
+
+async function carregarTodasInternacoes() {
+    const container = document.getElementById("tabela-internacoes");
+    try {
+        const linhas = await api("GET", "/internacoes");
+        renderTabela(
+            container,
+            linhas,
+            (linha) => [
+                {
+                    rotulo: "Editar",
+                    aoClicar: () => abrirModalInternacao(linha),
+                },
+                {
+                    rotulo: "Excluir",
+                    classe: "perigo",
+                    aoClicar: () => excluirInternacao(linha.id_internacao),
+                },
+            ],
+            ["id_paciente", "id_unidade"]
+        );
+    } catch (erro) {
+        toast(erro.message, "erro");
+    }
+}
+
+async function excluirInternacao(idInternacao) {
+    try {
+        await api("DELETE", `/internacoes/${idInternacao}`);
+        toast(`Internação #${idInternacao} removida com sucesso.`);
+        carregarInternacoes();
+    } catch (erro) {
+        toast(erro.message, "erro");
+    }
+}
+
+document
+    .getElementById("btn-nova-internacao")
+    .addEventListener("click", () => abrirModalInternacao());
+
+/** Converte "2026-07-28T14:00:00" (ou null) no formato do datetime-local. */
+function paraDatetimeLocal(valor) {
+    return valor ? valor.slice(0, 16) : "";
+}
+
+/**
+ * Um só modal para inserir e editar. Sem `internacao` é cadastro (POST);
+ * com `internacao` é edição (PUT), que substitui o registro inteiro.
+ */
+async function abrirModalInternacao(internacao) {
+    let opcoes;
+    try {
+        opcoes = await carregarOpcoes();
+    } catch (erro) {
+        toast(erro.message, "erro");
+        return;
+    }
+
+    const editando = internacao !== undefined;
+    const form = clonarTemplate("tpl-internacao");
+    preencherSelect(form.id_paciente, opcoes.pacientes, (p) => p.id_paciente, (p) => p.nome, "Selecione…");
+    preencherSelect(form.id_unidade, opcoes.unidades, (u) => u.id_unidade, (u) => u.nome, "Selecione…");
+
+    if (editando) {
+        form.id_paciente.value = internacao.id_paciente;
+        form.id_unidade.value = internacao.id_unidade;
+        form.data_hora_entrada.value = paraDatetimeLocal(internacao.data_hora_entrada);
+        form.data_hora_saida.value = paraDatetimeLocal(internacao.data_hora_saida);
+        form.leito.value = internacao.leito || "";
+        form.motivo.value = internacao.motivo || "";
+    }
+
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const corpo = {
+            id_paciente: Number(form.id_paciente.value),
+            id_unidade: Number(form.id_unidade.value),
+            data_hora_entrada: form.data_hora_entrada.value,
+            // null (e não omitido) para o PUT poder reabrir uma internação
+            // encerrada — é substituição completa, ver InternacaoCreate.
+            data_hora_saida: form.data_hora_saida.value || null,
+            leito: form.leito.value.trim() || null,
+            motivo: form.motivo.value.trim() || null,
+        };
+        try {
+            if (editando) {
+                await api("PUT", `/internacoes/${internacao.id_internacao}`, corpo);
+                toast(`Internação #${internacao.id_internacao} atualizada com sucesso.`);
+            } else {
+                const r = await api("POST", "/internacoes", corpo);
+                toast(`Internação #${r.id_internacao} cadastrada com sucesso.`);
+            }
+            fecharModal();
+            carregarInternacoes();
+        } catch (erro) {
+            // Paciente já com internação em aberto chega aqui como 409.
+            toast(erro.message, "erro");
+        }
+    });
+
+    abrirModal(
+        editando ? `Editar internação #${internacao.id_internacao}` : "Nova internação",
+        form
+    );
+}
+
+// ======================================================================
+// Escalas
+// ======================================================================
+
 async function carregarEscalas() {
     const container = document.getElementById("tabela-escalas");
     try {
@@ -895,6 +1042,7 @@ const RELATORIOS = {
     "plantoes-por-unidade": "rel-plantoes",
     "pacientes-sem-procedimento-alto": "rel-pacientes-alto",
     "tempos-observados-procedimentos": "rel-tempos-observados",
+    "residentes-sem-supervisor": "rel-sem-supervisor",
 };
 
 document.querySelectorAll("[data-relatorio]").forEach((botao) => {
@@ -945,6 +1093,24 @@ document
         }
     });
 
+// vw_estatisticas_atendimentos_mensal — ano/mês em branco = todo o período.
+document
+    .getElementById("form-estatisticas-mensais")
+    .addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const { ano, mes } = dadosDoForm(e.target);
+        const container = document.getElementById("rel-estatisticas-mensais");
+        try {
+            const linhas = await api(
+                "GET",
+                `/relatorios/estatisticas-mensais${queryString({ ano, mes })}`
+            );
+            renderTabela(container, linhas);
+        } catch (erro) {
+            toast(erro.message, "erro");
+        }
+    });
+
 // ======================================================================
 // Inicialização
 // ======================================================================
@@ -954,6 +1120,7 @@ const LOADERS = {
     procedimentos: carregarProcedimentos,
     profissionais: carregarProfissionais,
     pacientes: carregarPacientes,
+    internacoes: carregarInternacoes,
     escalas: carregarEscalas,
 };
 

@@ -78,15 +78,25 @@ body {
 }
 
 main {
-    max-width: 900px;
     margin: 1.5rem auto;
     padding: 0 1rem;
 }
 
+/* A largura máxima vive no painel, e não no <main>: assim uma aba com tabelas
+   largas pode ser mais larga que as outras sem mexer no resto do layout. */
 .painel {
     display: none;
     flex-direction: column;
     gap: 1.25rem;
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+/* Internações mostra as 11 colunas da vw_pacientes_internados; em 900px a
+   tabela precisaria de rolagem horizontal. */
+#internacoes {
+    max-width: 1120px;
 }
 
 .painel.ativo {
@@ -250,6 +260,9 @@ input:focus, select:focus {
 
 .resultado {
     margin-top: 1rem;
+    /* Tabelas largas (internados, estatísticas mensais) rolam dentro do próprio
+       card em vez de estourar a largura dele. */
+    overflow-x: auto;
 }
 
 /* ---------------------------- Modal ---------------------------------- */

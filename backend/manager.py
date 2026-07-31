@@ -188,6 +188,57 @@ class Manager:
             raise EntidadeNaoEncontrada(f"Escala {id_escala} não encontrada.")
         self.repository.remover_escala(id_escala)
 
+    def _validar_internacao(self, dados, ignorar_id: int | None = None) -> None:
+        """Regras comuns à criação e à edição de internação."""
+        if not self.repository.paciente_existe(dados.id_paciente):
+            raise EntidadeNaoEncontrada(
+                f"Paciente {dados.id_paciente} não encontrado."
+            )
+        if not self.repository.unidade_existe(dados.id_unidade):
+            raise EntidadeNaoEncontrada(f"Unidade {dados.id_unidade} não encontrada.")
+
+        # Um paciente não pode estar internado duas vezes ao mesmo tempo. Só
+        # vale para internações em aberto: encerradas podem se repetir à
+        # vontade, é o histórico dele.
+        if dados.data_hora_saida is None:
+            aberta = self.repository.internacao_aberta_do_paciente(
+                dados.id_paciente, ignorar_id
+            )
+            if aberta is not None:
+                raise OperacaoNaoPermitida(
+                    f"O paciente já possui a internação #{aberta} em aberto. "
+                    "Registre a alta dela antes de abrir outra."
+                )
+
+    def criar_internacao(self, dados) -> int:
+        self._validar_internacao(dados)
+        return self.repository.inserir_internacao(dados)
+
+    def atualizar_internacao(self, id_internacao: int, dados) -> None:
+        if not self.repository.internacao_existe(id_internacao):
+            raise EntidadeNaoEncontrada(f"Internação {id_internacao} não encontrada.")
+        self._validar_internacao(dados, ignorar_id=id_internacao)
+        self.repository.atualizar_internacao(id_internacao, dados)
+
+    def remover_internacao(self, id_internacao: int) -> None:
+        if not self.repository.internacao_existe(id_internacao):
+            raise EntidadeNaoEncontrada(f"Internação {id_internacao} não encontrada.")
+        self.repository.remover_internacao(id_internacao)
+
+    def listar_internacoes(self) -> list:
+        return self.repository.listar_internacoes()
+
+    def listar_pacientes_internados(self) -> list:
+        return self.repository.listar_pacientes_internados()
+
+    def listar_residentes_sem_supervisor(self) -> list:
+        return self.repository.listar_residentes_sem_supervisor()
+
+    def estatisticas_atendimentos_mensal(
+        self, ano: int | None = None, mes: int | None = None
+    ) -> list:
+        return self.repository.estatisticas_atendimentos_mensal(ano, mes)
+
     def reajustar_escala(self, dados) -> int:
         return self.repository.reajustar_escala(
             dados.id_residente,

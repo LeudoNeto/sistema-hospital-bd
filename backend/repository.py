@@ -1,7 +1,7 @@
 import json
 from contextlib import contextmanager
 
-from sqlalchemy import extract, func, select, update
+from sqlalchemy import extract, func, select, text, update
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import aliased, contains_eager, joinedload, selectinload
 
@@ -12,13 +12,16 @@ from models import (
     AuditoriaAtendimento,
     Base,
     Escala,
+    Internacao,
     Paciente,
+    PacienteInternado,
     Pessoa,
     Preceptor,
     Procedimento,
     ProcedimentoRealizado,
     Profissional,
     Residente,
+    ResidenteSemSupervisor,
     Unidade,
 )
 
@@ -90,6 +93,9 @@ class Repository:
 
     def atendimento_existe(self, id_atendimento: int) -> bool:
         return self._existe(Atendimento, id_atendimento)
+
+    def internacao_existe(self, id_internacao: int) -> bool:
+        return self._existe(Internacao, id_internacao)
 
     def escala_existe(self, id_escala: int) -> bool:
         return self._existe(Escala, id_escala)
@@ -261,6 +267,51 @@ class Repository:
             escala = s.get(Escala, id_escala)
             if escala is not None:
                 s.delete(escala)
+
+    def inserir_internacao(self, dados) -> int:
+        with _erros_do_banco(), transacao() as s:
+            internacao = Internacao(
+                id_paciente=dados.id_paciente,
+                id_unidade=dados.id_unidade,
+                data_hora_entrada=dados.data_hora_entrada,
+                data_hora_saida=dados.data_hora_saida,
+                leito=dados.leito,
+                motivo=dados.motivo,
+            )
+            s.add(internacao)
+            s.flush()
+            return internacao.id_internacao
+
+    def atualizar_internacao(self, id_internacao: int, dados) -> None:
+        """Substituição completa (PUT): todos os campos são sobrescritos."""
+        with _erros_do_banco(), transacao() as s:
+            internacao = s.get(Internacao, id_internacao)
+            if internacao is None:
+                return
+            internacao.id_paciente = dados.id_paciente
+            internacao.id_unidade = dados.id_unidade
+            internacao.data_hora_entrada = dados.data_hora_entrada
+            internacao.data_hora_saida = dados.data_hora_saida
+            internacao.leito = dados.leito
+            internacao.motivo = dados.motivo
+
+    def remover_internacao(self, id_internacao: int) -> None:
+        with transacao() as s:
+            internacao = s.get(Internacao, id_internacao)
+            if internacao is not None:
+                s.delete(internacao)
+
+    def internacao_aberta_do_paciente(
+        self, id_paciente: int, ignorar_id: int | None = None
+    ) -> int | None:
+        with sessao() as s:
+            consulta = select(Internacao.id_internacao).where(
+                Internacao.id_paciente == id_paciente,
+                Internacao.data_hora_saida.is_(None),
+            )
+            if ignorar_id is not None:
+                consulta = consulta.where(Internacao.id_internacao != ignorar_id)
+            return s.scalar(consulta.limit(1))
 
     def remover_procedimento_realizado(
         self, id_atendimento: int, id_procedimento: int
@@ -539,6 +590,92 @@ class Repository:
                 )
             return linhas
 
+
+    # Leituras das views
+    def listar_pacientes_internados(self) -> list:
+        with sessao() as s:
+            consulta = select(PacienteInternado).order_by(
+                PacienteInternado.dias_internado.desc(),
+                PacienteInternado.paciente,
+            )
+            return [
+                {
+                    "id_internacao": linha.id_internacao,
+                    "id_paciente": linha.id_paciente,
+                    "paciente": linha.paciente,
+                    "idade": linha.idade,
+                    "grupo_sanguineo": linha.grupo_sanguineo,
+                    "alergias": linha.alergias,
+                    "telefone": linha.telefone,
+                    "unidade": linha.unidade,
+                    "tipo_unidade": linha.tipo_unidade,
+                    "leito": linha.leito,
+                    "data_hora_entrada": linha.data_hora_entrada,
+                    "dias_internado": linha.dias_internado,
+                    "motivo": linha.motivo,
+                }
+                for linha in s.scalars(consulta)
+            ]
+
+    def listar_residentes_sem_supervisor(self) -> list:
+        with sessao() as s:
+            consulta = select(ResidenteSemSupervisor).order_by(
+                ResidenteSemSupervisor.ano_referencia.desc(),
+                ResidenteSemSupervisor.mes_referencia.desc(),
+                ResidenteSemSupervisor.residente,
+                func.field(ResidenteSemSupervisor.dia_semana, *DIAS_SEMANA),
+                func.field(ResidenteSemSupervisor.turno, *TURNOS),
+            )
+            return [
+                {
+                    "id_escala": linha.id_escala,
+                    "residente": linha.residente,
+                    "ano_residencia": linha.ano_residencia,
+                    "preceptor": linha.preceptor,
+                    "titulacao_preceptor": linha.titulacao_preceptor,
+                    "supervisao_ativa": bool(linha.supervisao_ativa),
+                    "motivo": linha.motivo,
+                    "unidade": linha.unidade,
+                    "dia_semana": linha.dia_semana,
+                    "turno": linha.turno,
+                    "mes_referencia": linha.mes_referencia,
+                    "ano_referencia": linha.ano_referencia,
+                }
+                for linha in s.scalars(consulta)
+            ]
+
+    def estatisticas_atendimentos_mensal(
+        self, ano: int | None = None, mes: int | None = None
+    ) -> list:
+        consulta = text(
+            """
+            SELECT *
+              FROM vw_estatisticas_atendimentos_mensal
+             WHERE (:ano IS NULL OR ano = :ano)
+               AND (:mes IS NULL OR mes = :mes)
+             ORDER BY ano DESC, mes DESC, unidade
+            """
+        )
+        with sessao() as s:
+            linhas = s.execute(consulta, {"ano": ano, "mes": mes}).mappings().all()
+
+        return [
+            {
+                "ano": linha["ano"],
+                "mes": linha["mes"],
+                "unidade": linha["unidade"],
+                "tipo_unidade": linha["tipo_unidade"],
+                "total_atendimentos": linha["total_atendimentos"],
+                # AVG/ROUND devolvem Decimal, que o JSON não serializa.
+                "duracao_media_minutos": float(linha["duracao_media_minutos"]),
+                "duracao_minima_minutos": linha["duracao_minima_minutos"],
+                "duracao_maxima_minutos": linha["duracao_maxima_minutos"],
+                "total_procedimentos": linha["total_procedimentos"],
+                "procedimentos_mais_comuns": linha["procedimentos_mais_comuns"],
+            }
+            for linha in linhas
+        ]
+
     def listar_auditoria(
         self,
         id_atendimento: int | None = None,
@@ -680,6 +817,32 @@ class Repository:
                     "capacidade_leitos": uni.capacidade_leitos,
                 }
                 for uni in s.scalars(consulta)
+            ]
+
+    def listar_internacoes(self) -> list:
+        with sessao() as s:
+            consulta = (
+                select(Internacao)
+                .options(
+                    joinedload(Internacao.paciente).joinedload(Paciente.pessoa),
+                    joinedload(Internacao.unidade),
+                )
+                .order_by(Internacao.data_hora_entrada.desc())
+            )
+            return [
+                {
+                    "id_internacao": i.id_internacao,
+                    "id_paciente": i.id_paciente,
+                    "paciente": i.paciente.pessoa.nome,
+                    "id_unidade": i.id_unidade,
+                    "unidade": i.unidade.nome,
+                    "leito": i.leito,
+                    "data_hora_entrada": i.data_hora_entrada,
+                    "data_hora_saida": i.data_hora_saida,
+                    "situacao": "Em aberto" if i.data_hora_saida is None else "Encerrada",
+                    "motivo": i.motivo,
+                }
+                for i in s.scalars(consulta).unique()
             ]
 
     def listar_escalas(self) -> list:

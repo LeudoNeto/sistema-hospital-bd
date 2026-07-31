@@ -9,6 +9,7 @@ from schemas import (
     AtendimentoUpdate,
     EscalaCreate,
     EscalaReajuste,
+    InternacaoCreate,
     PacienteUpdate,
 )
 
@@ -128,6 +129,57 @@ class Controller:
         )
         def tempos_observados_procedimentos():
             return manager.tempos_observados_procedimentos()
+
+        @self.router.get(
+            "/relatorios/residentes-sem-supervisor", tags=["Relatórios"]
+        )
+        def residentes_sem_supervisor():
+            return manager.listar_residentes_sem_supervisor()
+
+        @self.router.get("/relatorios/estatisticas-mensais", tags=["Relatórios"])
+        def estatisticas_atendimentos_mensal(
+            ano: Optional[int] = None, mes: Optional[int] = None
+        ):
+            """``vw_estatisticas_atendimentos_mensal``. Sem ano/mês: tudo."""
+            return manager.estatisticas_atendimentos_mensal(ano, mes)
+
+        @self.router.get("/internacoes/internados", tags=["Internações"])
+        def listar_pacientes_internados():
+            """``vw_pacientes_internados``: quem está no hospital agora."""
+            return manager.listar_pacientes_internados()
+
+        @self.router.get("/internacoes", tags=["Internações"])
+        def listar_internacoes():
+            return manager.listar_internacoes()
+
+        @self.router.post("/internacoes", status_code=201, tags=["Internações"])
+        def criar_internacao(internacao: InternacaoCreate):
+            try:
+                novo_id = manager.criar_internacao(internacao)
+            except EntidadeNaoEncontrada as erro:
+                raise HTTPException(status_code=404, detail=str(erro))
+            except OperacaoNaoPermitida as erro:
+                raise HTTPException(status_code=409, detail=str(erro))
+            return {"id_internacao": novo_id}
+
+        @self.router.put("/internacoes/{id_internacao}", tags=["Internações"])
+        def atualizar_internacao(id_internacao: int, internacao: InternacaoCreate):
+            try:
+                manager.atualizar_internacao(id_internacao, internacao)
+            except EntidadeNaoEncontrada as erro:
+                raise HTTPException(status_code=404, detail=str(erro))
+            except OperacaoNaoPermitida as erro:
+                raise HTTPException(status_code=409, detail=str(erro))
+            return {"id_internacao": id_internacao}
+
+        @self.router.delete(
+            "/internacoes/{id_internacao}", status_code=204, tags=["Internações"]
+        )
+        def remover_internacao(id_internacao: int):
+            try:
+                manager.remover_internacao(id_internacao)
+            except EntidadeNaoEncontrada as erro:
+                raise HTTPException(status_code=404, detail=str(erro))
 
         @self.router.get("/escalas", tags=["Escalas"])
         def listar_escalas():

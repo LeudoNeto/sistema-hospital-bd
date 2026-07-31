@@ -299,3 +299,56 @@ class AuditoriaAtendimento(Base):
             f"<AuditoriaAtendimento id={self.id_auditoria} "
             f"atendimento={self.id_atendimento} operacao={self.operacao!r}>"
         )
+
+
+# Views (database/views.sql)
+
+class PacienteInternado(Base):
+    """``vw_pacientes_internados`` — pacientes com internação em aberto."""
+
+    __tablename__ = "vw_pacientes_internados"
+
+    id_internacao: Mapped[int] = mapped_column(primary_key=True)
+    id_paciente: Mapped[int] = mapped_column(Integer)
+    paciente: Mapped[str] = mapped_column(String(150))
+    idade: Mapped[Optional[int]] = mapped_column(Integer)
+    grupo_sanguineo: Mapped[Optional[str]] = mapped_column(String(3))
+    alergias: Mapped[Optional[str]] = mapped_column(Text)
+    telefone: Mapped[Optional[str]] = mapped_column(String(20))
+    id_unidade: Mapped[int] = mapped_column(Integer)
+    unidade: Mapped[str] = mapped_column(String(100))
+    tipo_unidade: Mapped[str] = mapped_column(String(50))
+    leito: Mapped[Optional[str]] = mapped_column(String(10))
+    data_hora_entrada: Mapped[datetime] = mapped_column(DateTime)
+    dias_internado: Mapped[Optional[int]] = mapped_column(Integer)
+    motivo: Mapped[Optional[str]] = mapped_column(String(255))
+
+    def __repr__(self) -> str:
+        return f"<PacienteInternado paciente={self.paciente!r} leito={self.leito!r}>"
+
+
+class ResidenteSemSupervisor(Base):
+    """``vw_residentes_sem_supervisor`` — uma linha por plantão descoberto."""
+
+    __tablename__ = "vw_residentes_sem_supervisor"
+
+    id_escala: Mapped[int] = mapped_column(primary_key=True)
+    id_residente: Mapped[int] = mapped_column(Integer)
+    residente: Mapped[str] = mapped_column(String(150))
+    ano_residencia: Mapped[str] = mapped_column(String(2))
+    id_preceptor: Mapped[int] = mapped_column(Integer)
+    preceptor: Mapped[str] = mapped_column(String(150))
+    titulacao_preceptor: Mapped[str] = mapped_column(String(50))
+    supervisao_ativa: Mapped[bool] = mapped_column(Boolean)
+    motivo: Mapped[str] = mapped_column(String(60))
+    unidade: Mapped[str] = mapped_column(String(100))
+    dia_semana: Mapped[str] = mapped_column(String(15))
+    turno: Mapped[str] = mapped_column(String(15))
+    mes_referencia: Mapped[int] = mapped_column(Integer)
+    ano_referencia: Mapped[int] = mapped_column(Integer)
+
+    def __repr__(self) -> str:
+        return (
+            f"<ResidenteSemSupervisor escala={self.id_escala} "
+            f"residente={self.residente!r} motivo={self.motivo!r}>"
+        )

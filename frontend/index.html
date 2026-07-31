@@ -17,6 +17,7 @@
         <button class="aba" data-aba="procedimentos">Procedimentos</button>
         <button class="aba" data-aba="profissionais">Profissionais</button>
         <button class="aba" data-aba="pacientes">Pacientes</button>
+        <button class="aba" data-aba="internacoes">Internações</button>
         <button class="aba" data-aba="escalas">Escalas</button>
         <button class="aba" data-aba="relatorios">Relatórios</button>
     </nav>
@@ -68,6 +69,27 @@
             <div class="card">
                 <h2>Pacientes cadastrados</h2>
                 <div id="tabela-pacientes" class="resultado"></div>
+            </div>
+        </section>
+
+        <!-- ============================ INTERNAÇÕES ======================== -->
+        <section id="internacoes" class="painel">
+            <div class="card">
+                <div class="toolbar">
+                    <h2>Pacientes internados agora</h2>
+                    <span id="contador-internados" class="chip insert"></span>
+                </div>
+                <div id="tabela-internados" class="resultado"></div>
+            </div>
+
+            <div class="card">
+                <div class="toolbar">
+                    <h2>Todas as internações</h2>
+                    <button type="button" id="btn-nova-internacao" class="btn primario">
+                        + Nova internação
+                    </button>
+                </div>
+                <div id="tabela-internacoes" class="resultado"></div>
             </div>
         </section>
 
@@ -131,21 +153,12 @@
 
             <div class="card">
                 <h2>Tempo previsto x tempo observado por procedimento</h2>
-                <p class="ajuda">
-                    O tempo estimado é o do cadastro do procedimento. A média observada é
-                    calculada sobre o tempo real das realizações e mantida pelo trigger
-                    <code>trg_atualiza_media_procedimentos</code>.
-                </p>
                 <button class="btn" data-relatorio="tempos-observados-procedimentos">Gerar</button>
                 <div id="rel-tempos-observados" class="resultado"></div>
             </div>
 
             <div class="card">
                 <h2>Tempo médio de espera por unidade</h2>
-                <p class="ajuda">
-                    Da chegada do paciente até o início do primeiro procedimento.
-                    Deixe mês e ano em branco para considerar todo o período.
-                </p>
                 <form id="form-tempo-espera" class="form-inline">
                     <label>Mês
                         <input type="number" name="mes" min="1" max="12" placeholder="todos" />
@@ -156,6 +169,26 @@
                     <button type="submit" class="btn">Gerar</button>
                 </form>
                 <div id="rel-tempo-espera" class="resultado"></div>
+            </div>
+
+            <div class="card">
+                <h2>Residentes sem supervisor adequado</h2>
+                <button class="btn" data-relatorio="residentes-sem-supervisor">Gerar</button>
+                <div id="rel-sem-supervisor" class="resultado"></div>
+            </div>
+
+            <div class="card">
+                <h2>Estatísticas de atendimentos por mês e unidade</h2>
+                <form id="form-estatisticas-mensais" class="form-inline">
+                    <label>Ano
+                        <input type="number" name="ano" min="2000" placeholder="todos" />
+                    </label>
+                    <label>Mês
+                        <input type="number" name="mes" min="1" max="12" placeholder="todos" />
+                    </label>
+                    <button type="submit" class="btn">Gerar</button>
+                </form>
+                <div id="rel-estatisticas-mensais" class="resultado"></div>
             </div>
         </section>
     </main>
@@ -252,6 +285,36 @@
             </label>
             <label>Unidade
                 <select name="id_unidade"></select>
+            </label>
+            <button type="submit" class="btn primario">Salvar</button>
+        </form>
+    </template>
+
+    <template id="tpl-internacao">
+        <form id="form-internacao" class="form-grid">
+            <p class="ajuda largura-total">
+                Deixe a <strong>saída em branco</strong> para uma internação em aberto — é
+                assim que o paciente entra no card de internados. Preencher a saída registra
+                a alta e o tira de lá. Um paciente não pode ter duas internações em aberto
+                ao mesmo tempo.
+            </p>
+            <label>Paciente
+                <select name="id_paciente" required></select>
+            </label>
+            <label>Unidade
+                <select name="id_unidade" required></select>
+            </label>
+            <label>Entrada
+                <input type="datetime-local" name="data_hora_entrada" required />
+            </label>
+            <label>Saída
+                <input type="datetime-local" name="data_hora_saida" />
+            </label>
+            <label>Leito
+                <input type="text" name="leito" maxlength="10" placeholder="(opcional)" />
+            </label>
+            <label>Motivo
+                <input type="text" name="motivo" maxlength="255" placeholder="(opcional)" />
             </label>
             <button type="submit" class="btn primario">Salvar</button>
         </form>

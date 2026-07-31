@@ -67,6 +67,24 @@ class EscalaReajuste(BaseModel):
     ano: Optional[int] = Field(default=None, ge=2000)
 
 
+class InternacaoCreate(BaseModel):
+    id_paciente: int
+    id_unidade: int
+    data_hora_entrada: datetime
+    data_hora_saida: Optional[datetime] = None
+    leito: Optional[str] = Field(default=None, max_length=10)
+    motivo: Optional[str] = Field(default=None, max_length=255)
+
+    @model_validator(mode="after")
+    def saida_nao_antecede_entrada(self):
+        if (
+            self.data_hora_saida is not None
+            and self.data_hora_saida < self.data_hora_entrada
+        ):
+            raise ValueError("A data/hora de saída não pode ser anterior à de entrada.")
+        return self
+
+
 class PacienteUpdate(BaseModel):
     endereco: Optional[str] = None
     num_convenio: Optional[str] = None
