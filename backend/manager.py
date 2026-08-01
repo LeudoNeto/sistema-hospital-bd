@@ -1,3 +1,4 @@
+from concorrencia import simular_escala_concorrente
 from erros import EntidadeNaoEncontrada, OperacaoNaoPermitida
 from repository import Repository
 
@@ -152,6 +153,20 @@ class Manager:
 
     def pacientes_sem_procedimento_alto(self) -> list:
         return self.repository.pacientes_sem_procedimento_alto()
+
+    def simular_escala_concorrente(self, dados) -> list:
+        if not self.repository.unidade_existe(dados.id_unidade):
+            raise EntidadeNaoEncontrada(f"Unidade {dados.id_unidade} não encontrada.")
+        if not self.repository.residente_existe(dados.id_residente):
+            raise EntidadeNaoEncontrada(
+                f"Residente {dados.id_residente} não encontrado."
+            )
+        if not self.repository.preceptor_existe(dados.id_preceptor):
+            raise EntidadeNaoEncontrada(
+                f"Preceptor {dados.id_preceptor} não encontrado."
+            )
+
+        return simular_escala_concorrente(dados)
 
     def preceptores_de_pacientes_flamenguistas(self) -> list:
         return self.repository.preceptores_de_pacientes_flamenguistas()

@@ -144,6 +144,15 @@ class Controller:
         def percentual_alto_risco_por_residente():
             return manager.percentual_alto_risco_por_residente()
 
+        @self.router.post("/relatorios/simular-concorrencia", tags=["Relatórios"])
+        def simular_escala_concorrente(escala: EscalaCreate):
+            try:
+                return manager.simular_escala_concorrente(escala)
+            except EntidadeNaoEncontrada as erro:
+                raise HTTPException(status_code=404, detail=str(erro))
+            except OperacaoNaoPermitida as erro:
+                raise HTTPException(status_code=409, detail=str(erro))
+
         @self.router.get(
             "/relatorios/residentes-sem-supervisor", tags=["Relatórios"]
         )

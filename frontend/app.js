@@ -100,6 +100,10 @@ const ROTULOS = {
     procedimentos_realizados: "Realizados",
     de_alto_risco: "De alto risco",
     percentual_alto_risco: "Alto risco (%)",
+    cenario: "Cenário",
+    transacao: "Transação",
+    espera_no_lock_ms: "Espera no lock (ms)",
+    escalas_no_slot: "Escalas no slot",
 };
 
 // Campos de ATENDIMENTO guardados no JSON da auditoria. id_atendimento fica
@@ -1121,6 +1125,62 @@ document
         }
     });
 
+// Simulação de concorrência. Os selects são preenchidos uma vez, na carga da
+// página, para não perder a escolha do usuário a cada troca de aba.
+const formSimulacao = document.getElementById("form-simular-concorrencia");
+
+async function popularFormSimulacao() {
+    try {
+        const opcoes = await carregarOpcoes();
+        // Sem placeholder: o formulário já vem pronto para executar.
+        preencherSelect(formSimulacao.id_residente, opcoes.residentes, (p) => p.id_pessoa, (p) => p.nome);
+        preencherSelect(formSimulacao.id_preceptor, opcoes.preceptores, (p) => p.id_pessoa, (p) => p.nome);
+        preencherSelect(formSimulacao.id_unidade, opcoes.unidades, (u) => u.id_unidade, (u) => u.nome);
+        preencherSelectSimples(formSimulacao.dia_semana, DIAS_SEMANA);
+        preencherSelectSimples(formSimulacao.turno, TURNOS);
+        formSimulacao.dia_semana.value = "quarta";
+        formSimulacao.turno.value = "noite";
+    } catch (erro) {
+        toast(erro.message, "erro");
+    }
+}
+
+// É POST, e não GET, porque grava de verdade na ESCALA: a escala vencedora do
+// 2º cenário fica no banco e aparece na aba Escalas. Leva ~1,5s, porque as duas
+// transações seguram o recurso de propósito para se cruzarem.
+formSimulacao.addEventListener("submit", async (evento) => {
+    evento.preventDefault();
+    const botao = formSimulacao.querySelector('button[type="submit"]');
+    const container = document.getElementById("rel-concorrencia");
+    const rotuloOriginal = botao.textContent.trim();
+    const corpo = {
+        id_residente: Number(formSimulacao.id_residente.value),
+        id_preceptor: Number(formSimulacao.id_preceptor.value),
+        id_unidade: Number(formSimulacao.id_unidade.value),
+        dia_semana: formSimulacao.dia_semana.value,
+        turno: formSimulacao.turno.value,
+        mes_referencia: Number(formSimulacao.mes_referencia.value),
+        ano_referencia: Number(formSimulacao.ano_referencia.value),
+    };
+
+    botao.disabled = true;
+    botao.textContent = "Executando…";
+    container.innerHTML =
+        '<p class="empty">Duas transações concorrentes em andamento…</p>';
+    try {
+        const linhas = await api("POST", "/relatorios/simular-concorrencia", corpo);
+        renderTabela(container, linhas);
+    } catch (erro) {
+        // Slot já ocupado por escala real, ou dia/turno que o trigger de
+        // sobreposição barraria, chegam aqui como 409.
+        container.innerHTML = "";
+        toast(erro.message, "erro");
+    } finally {
+        botao.disabled = false;
+        botao.textContent = rotuloOriginal;
+    }
+});
+
 // ======================================================================
 // Inicialização
 // ======================================================================
@@ -1135,4 +1195,5 @@ const LOADERS = {
 };
 
 popularFiltroPacientes(); // opções do filtro por paciente
+popularFormSimulacao(); // selects do card de concorrência
 carregarAtendimentos(); // aba inicial
